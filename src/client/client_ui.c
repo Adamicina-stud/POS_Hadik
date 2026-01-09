@@ -32,6 +32,12 @@ void ui_draw(int w, int h, int tick, const char *grid_out) {
     refresh();
 }
 
+void ui_draw_waiting(void) {
+  erase();
+  mvprintw(0, 0, "Waiting for server frame... (pres q to quit.)");
+  refresh();
+}
+
 void ui_end(void) {
     endwin();
 }
