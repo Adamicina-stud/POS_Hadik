@@ -49,8 +49,7 @@ int game_add_player(int client_id, const char *name) {
     players[player_count].body[segment].y = -1;
   }
   player_count++;
-
-  (void)name; // zatiaľ nepoužité
+  printf("Pripojil sa novy hrac! Pocet hracov: %d", player_count);
   return 0;
 }
 
@@ -172,10 +171,10 @@ void game_send_grid_to_clients(int tick) {
         line[x] = grid[y][x];
         printf("%c", line[x]);                                                    // TEST
       }
+      printf("\n");
       line[W] = '\0';
-      printf("    %c\n", line[W - 1]);                                            // TEST
-      net_send_line(players[player].client_id, ".............................."); //
-      //net_send_line(players[player].client_id, line);
+      //net_send_line(players[player].client_id, "..............................\0"); // TEST
+      net_send_line(players[player].client_id, line);
     }
   }
 }

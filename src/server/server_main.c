@@ -1,8 +1,8 @@
-#include <bits/pthreadtypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -13,14 +13,33 @@
 #include "server_game.h"
 #include "server_net.h"
 
+typedef struct {
+  pthread_mutex_t mutex;
+  int client_fd;
+  int close;
+} thread_data_t;
 
-
-void *method(void *arg) {
+void *listen_for_input(void *arg) {
+  thread_data_t *data = (thread_data_t *) arg;
   
+  while (1) {
+    char line[256];
+    while (recv_line(data->client_fd, line, sizeof(line)) > 0 ) {
+      char dir;
+      if (sscanf(line, "DIR %c", &dir) == 1) {
+        pthread_mutex_lock(&data->mutex);
+
+        game_set_dir(data->client_fd, dir);
+
+        pthread_mutex_unlock(&data->mutex);
+      }
+    }
+  }
+  return NULL;
 }
 
 int main(int argc, char *argv[]) {
-  int tick = 200000;
+  int tick = 200000;  // 2 000 000 - 2 sekundy      200 000 - 0.2 sekundy
   int port = DEFAULT_PORT;
   char *c;
   if (argc >= 4) port = strtol(argv[3], &c, 10);
@@ -78,24 +97,36 @@ int main(int argc, char *argv[]) {
   printf("Od klienta: %s", client_name);
 
   game_add_player(client_fd, client_name);
+ 
+
+  // Vytvorenie threadu
+  thread_data_t thread_data;
+  thread_data.client_fd = client_fd;
+  thread_data.close = 0;
+  pthread_mutex_init(&thread_data.mutex, NULL);
+  
+  
+  pthread_t input_thread;
+  if (pthread_create(&input_thread, NULL, listen_for_input, &thread_data) != 0) {
+    fprintf(stderr, "Nepodarilo sa vytvorit listen thread");
+    net_close(client_fd);
+    net_close(listen_fd);
+    pthread_mutex_destroy(&thread_data.mutex);
+    return 1;
+  }
+  
 
   // Game loop
   while (1) {
-    
-    game_send_grid_to_clients(tick);
+    pthread_mutex_lock(&thread_data.mutex);
 
-    // Input
-    char line[256];
-    while (recv_line(client_fd, line, sizeof(line)) > 0) {
-      char dir;
-      if (sscanf(line, "DIR %c", &dir) == 1) {
-        game_set_dir(client_fd, dir);
-      }
-    }
+    game_send_grid_to_clients(tick); 
     
     game_tick();
+
+    pthread_mutex_unlock(&thread_data.mutex);
     
-    sleep(2);
+    usleep(tick);
   }
   
   net_close(client_fd);
@@ -104,19 +135,3 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
-
-/*
-
-  void game_over(int client) {
-    head.x = -1;
-    head.y = -1;
-    for (int i = 0; i <= MAX_SNAKE_LENGTH; i++) {
-      if (body[i].x == -1) break;
-
-      grid[body[i].x][body[i].y] = '.';
-
-      body[i].x = -1;
-      body[i].y = -1;
-    }
-  }
-*/
