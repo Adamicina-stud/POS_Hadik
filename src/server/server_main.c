@@ -9,6 +9,8 @@
 
 #include "../common/common.h"
 #include "../common/protocol.h"
+#include "server_game.h"
+#include "server_net.h"
 
 int send_grid_to_clients(int clients, char grid[MAX_W][MAX_H], int width, int height, int tick) {
   char message[256];
@@ -61,7 +63,8 @@ int main(int argc, char *argv[]) {
     close(listen_fd);
     return 1;
   }
-
+  
+  // Sirka a vyska mapy
   int width = GRID_W;
   int height = GRID_H;
 
@@ -86,6 +89,7 @@ int main(int argc, char *argv[]) {
     if (arg1 < 0) height = GRID_H;
   }
   
+  printf("Grid %d x %d \n", width, height);
   printf("Server beží na porte %d...\n", port);
 
   // Accept – čakáme na klienta
@@ -109,13 +113,13 @@ int main(int argc, char *argv[]) {
   //send_line(client_fd, message);
   //send_line(client_fd, "GRID");
   
-  char grid[width][height];
-  for (int h = 0; h <= height; h++) {
-    for (int w = 0; w <= width; w++) {
-      grid[w][h] = '.';
+  char grid[height][width];
+  for (int h = 0; h < height; h++) {
+    for (int w = 0; w < width; w++) {
+      grid[h][w] = '.';
     }
   }
-  
+   
   int temp_head_x = width / 2;
   int temp_head_y = height / 2;
 
@@ -125,15 +129,81 @@ int main(int argc, char *argv[]) {
     int last_y = temp_head_y;
     
     if (temp_head_y == 0){
-      temp_head_y = height;
+      temp_head_y = height - 1;
     } else {
       temp_head_y -= 1;
     }
 
-    grid[last_x][last_y] = '.';
-    grid[temp_head_x][temp_head_y] = '@';
+    grid[last_y][last_x] = '.';
+    grid[temp_head_y][temp_head_x] = '@';
 
-    /*
+    //send_grid_to_clients(client_fd, grid, width, height, tick);
+
+    send_line(client_fd, message);
+    send_line(client_fd, "GRID");
+    for (int y = 0; y < height; y++) {
+      char line[width + 1];
+      for (int x = 0; x < width; x++) {
+        line[x] = grid[y][x];
+      }
+      line[width] = '\0';
+      send_line(client_fd, line);
+    }
+
+    sleep(2);
+    a++;
+  }
+  
+  close(client_fd);
+  close(listen_fd);
+
+  return 0;
+}
+
+/*
+  // Novy main ked ^ funguje
+  int port = 5557;
+  int listen_fd = net_init(port);
+  
+  printf("Server bezi na porte %d \n", port);
+
+  int client_fd = net_accept(listen_fd);
+
+  printf("Klient bol  pripojeny \n");
+  
+  char recieved_line[256];
+  net_recv_line(client_fd, &recieved_line, sizeof(recieved_line));
+  printf("Od klienta: %s \n", recieved_line);
+
+  // Vyska a sirka mapy
+  int width = GRID_W;
+  int height = GRID_H;
+
+  if (argc >=3 {
+    char *c;
+    int arg0 = strtol(argv[1], &c, 10);
+    int arg1 = strtol(argv[2], &c, 10);
+
+    if (arg0 > MAX_W) {
+      width = MAX_W;
+    } else {
+      width = arg0;
+    }
+
+    if (arg1 > MAX_H) {
+      height = MAX_H;
+    } else {
+      height = arg1;
+    }
+
+    if (arg0 <= 0) width = GRID_W;
+    if (arg1 <= 0) height = GRID_H;
+  }
+}
+  */
+
+/*
+// --------------------------------------------------------------
     int last_x = head.x;
     int last_y = head.y;
     
@@ -225,11 +295,8 @@ int main(int argc, char *argv[]) {
       body[i].y = -1;
     }
   }
-    */ 
 
     // Posielanie gridu klientovi
-    send_grid_to_clients(client_fd, grid, width, height, tick);
-    /*
     send_line(client_fd, message);
     send_line(client_fd, "GRID");
     for (int h = 0; h <= height; h++) {
@@ -239,15 +306,5 @@ int main(int argc, char *argv[]) {
       }
       send_line(client_fd, line);
     }
-    */
-    usleep(tick);     // sleep(sekundy);
-    a++;
   }
-    
-
-  // Zatvorenie
-  close(client_fd);
-  close(listen_fd);
-
-  return 0;
-}
+    */
