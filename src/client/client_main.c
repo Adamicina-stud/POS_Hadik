@@ -1,117 +1,82 @@
-#include <arpa/inet.h>     // Práca s IP adresami
-#include <netinet/in.h>    // sockaddr_in štruktúra
-#include <sys/socket.h>    // funkcie pre sockety
-#include <unistd.h>        // read, write, close
-#include <stdio.h>         // printf, perror
-#include <string.h>
-#include <stdlib.h>        // atoi, exit
+#include <stdio.h>
+#include <stdlib.h>
 
-#include "../common/common.h"    // naše konštanty (GRID_W, GRID_H, port…)
-#include "../common/protocol.h"  // naše funkcie na posielanie/čítanie správ
+#include "client_net.h"
+#include "client_ui.h"
+#include "client_input.h"
 
-// --- Funkcia ktorá vytvorí socket a pripojí sa na server ---
-static int connect_to(const char *ip, int port) {
-    // 1) Vytvoríme socket (ako keby sme vytvorili komunikačný “telefón”)
-    int fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (fd < 0) {
-        perror("socket failed"); // vypíše chybu ak sa socket nepodarí vytvoriť
-        return -1;
-    }
-
-    // 2) Pripravíme si adresu servera (kam sa chceme pripojiť)
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr)); // vynulujeme štruktúru
-    addr.sin_family = AF_INET;      // IPv4
-    addr.sin_port = htons(port);    // Port pre server
-
-    // 3) Prekonvertujeme IP string na binárnu formu
-    if (inet_pton(AF_INET, ip, &addr.sin_addr) != 1) {
-        printf("Zlá IP adresa!\n");
-        close(fd);
-        return -1;
-    }
-
-    // 4) Pripojíme sa na server (vytočíme “číslo” servera)
-    if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        perror("connect failed"); // vypíše chybu ak server nebeží alebo je zlý port/IP
-        close(fd);
-        return -1;
-    }
-
-    return fd; // vrátime file‑descriptor socketu (to je číslo nášho spojenia)
-}
+#include "../common/common.h"
 
 int main(int argc, char **argv) {
+    const char *ip   = "127.0.0.1";
+    int port         = DEFAULT_PORT;
+    const char *name = "Fenrir60";
 
-  // Default hodnoty (ak by sme nič nezadali v termináli)
-  const char *ip = "127.0.0.1";  // lokálny server
-  int port = DEFAULT_PORT;       // 5555 (z common.h)
-  const char *name = "Fenrir60"; // meno hráča
+    if (argc >= 2) ip = argv[1];
+    if (argc >= 3) port = atoi(argv[2]);
+    if (argc >= 4) name = argv[3];
 
-  // Ak zadáme argumenty v termináli, tak si ich vezmeme
-  if (argc >= 2) ip = argv[1];
-  if (argc >= 3) port = atoi(argv[2]);
-  if (argc >= 4) name = argv[3];
-
-  // Zavoláme funkciu a pripojíme sa na server
-  int sock_fd = connect_to(ip, port);
-  if (sock_fd < 0) {
-    printf("Nepodarilo sa pripojiť na server 😢\n");
-    return 1; // ukončíme program s chybou
-  }
-
-  printf("Pripojený na server! 🔥\n");
-
-  // Pošleme serveru JOIN správu
-  char msg[128];
-  snprintf(msg, sizeof(msg), "JOIN %s\n", name);
-
-  if (send_str(sock_fd, msg) < 0) {
-      perror("send failed");
-      close(sock_fd);
-      return 1;
-  }
-
-  // Čítame odpoveď od servera a vypíšeme ju
-  char line[512];
-
-  while(1) {
-    // Prečítanie STATE
-    int n = recv_line(sock_fd, line, sizeof(line));
-    if (n <= 0) return 1;
-
-    int width, height, tick;
-    int ok = sscanf(line, "STATE %d %d %d", &width, &height, &tick);
-    if (ok != 3) {
-      fprintf(stderr, "Bad STATE line: %s", line);
-      close(sock_fd);
-      return 1;
+    // 1) connect
+    int fd = client_connect(ip, port);
+    if (fd < 0) {
+        fprintf(stderr, "Nepodarilo sa pripojiť na server.\n");
+        return 1;
     }
 
-    printf("Server posiela grid %dx%d\n", width, height);
-
-    if (width <= 0 || height <=0) { //pridať kontrolu max vyšky a širky ked bude v common/
-      fprintf(stderr, "grid size out of range: %dx%d\n", width, height);
+    // 2) JOIN
+    if (client_send_join(fd, name) < 0) {
+        fprintf(stderr, "Nepodarilo sa poslať JOIN.\n");
+        client_send_leave(fd);
+        // close spravíš v net_close ak ho máš; ak nie, tak close(fd) tu
+        return 1;
     }
 
-    //Prečitanie GRID 
-    n = recv_line(sock_fd, line, sizeof(line));
-    if (n <= 0) return 1;
-    if (strncmp(line, "GRID", 4) != 0) {
-      fprintf(stderr, "Expected GRID, got: %s\n", line);
+    // 3) ncurses init
+    ui_init();
+
+    int w = 0, h = 0, tick = 0;
+
+    // buffer na grid: (MAX_H * (MAX_W+1)) je bezpečné, lebo frame validuje MAX_W/MAX_H
+    //static char grid_buf[(MAX_H) * (MAX_W + 1)];
+    static char grid_buf[(1000) * (1000 + 1)];
+
+    int running = 1;
+    while (running) {
+        // a) prijmi 1 frame
+        int rc = client_recv_frame(fd, &w, &h, &tick, grid_buf, sizeof(grid_buf));
+        if (rc == 0) {
+            // server sa odpojil
+            break;
+        }
+        if (rc < 0) {
+            // chyba protokolu / čítania
+            break;
+        }
+
+        // b) vykresli frame
+        ui_draw(w, h, tick, grid_buf);
+
+        // c) klávesy (neblokuje, lebo ui_init má nodelay)
+        int ch = ui_get_key();
+        if (ch != -1) {
+            if (ch == 'q' || ch == 'Q' || ch == 27) { // ESC
+                client_send_leave(fd);
+                running = 0;
+                break;
+            }
+
+            // mapuj kláves -> dir (DIR_NONE ak nič)
+            direction_t dir = input_key_to_dir(ch);
+            if (dir != DIR_NONE) {
+                char dc = input_dir_to_char(dir); // 'U','D','L','R'
+                client_send_dir(fd, dc);
+            }
+        }
     }
 
-    for (int y = 0; y < height; y++) 
-    {
-      n = recv_line(sock_fd, line, sizeof(line));
-      if(n <= 0) break;
-      printf("GRID[%d]: %s", y, line);
-    }
-  }
+    // 4) cleanup
+    ui_end();
+    client_send_leave(fd); // ak už odišiel server, send zlyhá, to nevadí
 
-  // Zatvoríme spojenie (ako keby sme zložili hovor)
-  close(sock_fd);
-  printf("Spojenie ukončené.\n");
-
-  return 0;
+    return 0;
 }
