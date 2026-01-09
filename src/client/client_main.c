@@ -10,7 +10,7 @@
 int main(int argc, char **argv) {
     const char *ip   = "127.0.0.1";
     int port         = DEFAULT_PORT;
-    const char *name = "Fenrir60";
+    const char *name = "player";
 
     if (argc >= 2) ip = argv[1];
     if (argc >= 3) port = atoi(argv[2]);
@@ -76,7 +76,6 @@ int main(int argc, char **argv) {
 
     // 4) cleanup
     ui_end();
-    client_send_leave(fd); // ak už odišiel server, send zlyhá, to nevadí
 
     return 0;
 }

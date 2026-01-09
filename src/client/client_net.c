@@ -60,8 +60,7 @@ static int parse_state_line(const char *line, int *w, int *h, int *tick) {
     int ok = sscanf(line, "STATE %d %d %d", &ww, &hh, &tt);
     if (ok != 3) return 0;
 
-    //if (ww <= 0 || hh <= 0 || ww > MAX_W || hh > MAX_H) return 0;
-    if (ww <= 0 || hh <= 0) return 0;
+    if (ww <= 0 || hh <= 0 || ww > GRID_MAX_W || hh > GRID_MAX_H) return 0;
 
     if (w) *w = ww;
     if (h) *h = hh;
@@ -126,4 +125,8 @@ int client_recv_frame(int fd, int *w, int *h, int *tick, char *grid_out, size_t 
     }
 
     return 1;
+}
+
+void client_net_close(int fd) {
+  close(fd);
 }

@@ -26,4 +26,6 @@ int client_send_leave(int fd);
 // Vráti: 1 = OK, 0 = server sa odpojil, -1 = chyba
 int client_recv_frame(int fd, int *w, int *h, int *tick, char *grid_out, size_t grid_out_size);
 
+void client_net_close(int fd);
+
 #endif
