@@ -39,7 +39,7 @@ void *listen_for_input(void *arg) {
 }
 
 int main(int argc, char *argv[]) {
-  int tick = 200000;  // 2 000 000 - 2 sekundy      200 000 - 0.2 sekundy
+  int tick = 1000000;  // 2 000 000 - 2 sekundy      200 000 - 0.2 sekundy
   int port = DEFAULT_PORT;
   char *c;
   if (argc >= 4) port = strtol(argv[3], &c, 10);
@@ -75,12 +75,22 @@ int main(int argc, char *argv[]) {
     if (arg1 < 0) height = GRID_H;
   }
   
-  game_init(width, height);
+  game_init(width, height, 0);
 
   printf("Grid %d x %d \n", width, height);
   printf("Server beží na porte %d...\n", port);
+  /*
+  //-------------- TEST ------------------
+  game_add_player(1, "TEST");
   
-  
+  for (int i = 0; i < 8; i++) {
+    game_send_grid_to_clients(tick);
+
+    game_tick();
+  }
+  return 0;
+  //-------------- TEST ------------------
+  */
   // Accept – čakáme na klienta
   int  client_fd = net_accept(listen_fd);
   if (client_fd < 0) {
@@ -126,7 +136,7 @@ int main(int argc, char *argv[]) {
 
     pthread_mutex_unlock(&thread_data.mutex);
     
-    usleep(tick);
+    sleep(1);
   }
   
   net_close(client_fd);
