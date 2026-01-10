@@ -15,15 +15,16 @@
 
 typedef struct {
   int fd;
-
   pthread_mutex_t mutex;
 
   int w, h, tick, score;
   char grid[MAX_H * (MAX_W + 1)];
   int has_frame;
-
   int running;
   int disconnected;
+
+  int ended;
+  char end_reason[256];
 } client_state_t;
 
 static void *net_thread_fn(void *arg) {
@@ -40,8 +41,18 @@ static void *net_thread_fn(void *arg) {
     int running = st->running;
     pthread_mutex_unlock(&st->mutex);
     if (!running) break;
+  
+    char end_reason[256];
+    int rc = client_recv_frame(fd, &w, &h, &tick, &score, grid_buf, sizeof(grid_buf), end_reason, sizeof(end_reason));
+    if (rc == 2) {
+      pthread_mutex_lock(&st->mutex);
+      st->ended = 1;
+      snprintf(st->end_reason, sizeof(st->end_reason), "%s", end_reason);
+      st->running = 0;
+      pthread_mutex_unlock(&st->mutex);
+      break;
+    }
 
-    int rc = client_recv_frame(fd, &w, &h, &tick, &score, grid_buf, sizeof(grid_buf));
     if (rc <= 0) {
       //0 = server sa odpojil, -1 = chyba
       pthread_mutex_lock(&st->mutex);
@@ -165,6 +176,8 @@ int main(int argc, char **argv) {
         client_send_dir(fd, dc);
         last_dir = dir;
       }
+
+      usleep(10*1000); // 10ms
     }
 
   }
@@ -182,7 +195,10 @@ int main(int argc, char **argv) {
   client_net_close(fd);
 
   //info nakoniec
-  if (st.disconnected) {
+  if (st.ended) {
+    fprintf(stderr, "KONEIC HRY: %s\n", st.end_reason);
+  }
+  else if (st.disconnected) {
     fprintf(stderr, "Server sa odpojil alebo nastala chyba siete.");
   }
   

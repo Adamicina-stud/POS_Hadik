@@ -24,7 +24,7 @@ int client_send_leave(int fd);
 // - grid_out musí byť veľké aspoň (h * (w+1)) bajtov
 //   (každý riadok uloží ako nul-terminovaný string za sebou)
 // Vráti: 1 = OK, 0 = server sa odpojil, -1 = chyba
-int client_recv_frame(int fd, int *w, int *h, int *tick,int *score, char *grid_out, size_t grid_out_size);
+int client_recv_frame(int fd, int *w, int *h, int *tick, int *score, char *grid_out, size_t grid_out_size, char *end_reason, size_t end_reason_size);
 
 void client_net_close(int fd);
 

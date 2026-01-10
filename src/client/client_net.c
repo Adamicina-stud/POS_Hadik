@@ -2,6 +2,7 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <stddef.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -58,7 +59,7 @@ static int parse_state_line(const char *line, int *w, int *h, int *tick, int *sc
     // vráti 1 ak OK, inak 0
     int ww, hh, tt, ss;
     int ok = sscanf(line, "STATE %d %d %d %d", &ww, &hh, &tt, &ss);
-    if (ok != 3) return 0;
+    if (ok != 4) return 0;
 
     if (ww <= 0 || hh <= 0 || ww > MAX_W || hh > MAX_H) return 0;
 
@@ -69,7 +70,7 @@ static int parse_state_line(const char *line, int *w, int *h, int *tick, int *sc
     return 1;
 }
 
-int client_recv_frame(int fd, int *w, int *h, int *tick, int *score, char *grid_out, size_t grid_out_size) {
+int client_recv_frame(int fd, int *w, int *h, int *tick, int *score, char *grid_out, size_t grid_out_size, char *end_reason, size_t end_reason_size) {
     if (!grid_out || grid_out_size == 0) return -1;
 
     char line[2048];
@@ -79,6 +80,19 @@ int client_recv_frame(int fd, int *w, int *h, int *tick, int *score, char *grid_
     int n = recv_line(fd, line, sizeof(line));
     if (n == 0) return 0;       // server sa odpojil
     if (n < 0) return -1;
+
+    if (strncmp(line, "END", 3) == 0) {
+    // END <reason...>
+    const char *p = line + 3;
+    while (*p == ' ') p++;
+    if (end_reason && end_reason_size > 0) {
+        snprintf(end_reason, end_reason_size, "%s", p);
+        // odsekni \n
+        size_t L = strlen(end_reason);
+        if (L > 0 && end_reason[L-1] == '\n') end_reason[L-1] = '\0';
+    }
+    return 2; // špeciálne: hra skončila
+}
 
     if (!parse_state_line(line, w, h, tick, score)) {
         fprintf(stderr, "Bad STATE line: %s", line);

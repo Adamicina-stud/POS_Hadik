@@ -5,7 +5,10 @@ INCLUDES=-Isrc -Isrc/common -Isrc/server -Isrc/client
 COMMON_SRCS=src/common/protocol.c
 COMMON_HDRS=src/common/common.h src/common/protocol.h
 
-SERVER_SRCS=src/server/server_main.c $(COMMON_SRCS)
+SERVER_SRCS=src/server/server_main.c \
+						src/server/server_game.c \
+						src/server/server_net.c \
+						$(COMMON_SRCS)
 
 CLIENT_SRCS=src/client/client_main.c \
 						src/client/client_net.c \
