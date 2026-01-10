@@ -67,6 +67,7 @@ static void *net_thread_fn(void *arg) {
     st->w = w;
     st->h = h;
     st->tick = tick;
+    st->score = score;
     memcpy(st->grid, grid_buf, sizeof(grid_buf));
     st->has_frame = 1;
     pthread_mutex_unlock(&st->mutex);
@@ -160,6 +161,7 @@ int main(int argc, char **argv) {
     if (ch != -1) {
       if (ch == 'q' || ch == 'Q' || ch == 27) { // ESC
         // nastav stop
+        client_send_leave(fd);
         pthread_mutex_lock(&st.mutex);
         st.running = 0;
         pthread_mutex_unlock(&st.mutex);
@@ -176,10 +178,8 @@ int main(int argc, char **argv) {
         client_send_dir(fd, dc);
         last_dir = dir;
       }
-
-      usleep(10*1000); // 10ms
     }
-
+    usleep(10*1000); // 10ms
   }
 
   // cleanup
@@ -196,7 +196,9 @@ int main(int argc, char **argv) {
 
   //info nakoniec
   if (st.ended) {
-    fprintf(stderr, "KONEIC HRY: %s\n", st.end_reason);
+    fprintf(stderr, "KONIEC HRY: %s\n", st.end_reason);
+    //fprintf(stderr, "Press Enter...\n"); // idk čo to spravý
+    //getchar();
   }
   else if (st.disconnected) {
     fprintf(stderr, "Server sa odpojil alebo nastala chyba siete.");
