@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
   ui_init();
 
   // aby sa neposielal 1000x rovnaký smer;
-  direction_t last_dir = DIR_NONE;
+  //direction_t last_dir = DIR_NONE;
 
   // lokálne buffre pre UI (kreslenie bez držania mutexu)
   int w = 0, h = 0, tick = 0, score = 0;
@@ -151,7 +151,7 @@ int main(int argc, char **argv) {
     if (!running || disconnected) break;
 
     if (have_local) {  //vykresli frame ak je
-      ui_draw(w, h, tick, score, grid_local);
+      ui_draw(name , w, h, tick, score, grid_local);
     } else {
       ui_draw_waiting();
     }
@@ -173,10 +173,10 @@ int main(int argc, char **argv) {
 
       // mapuj kláves -> dir (DIR_NONE ak nič)
       direction_t dir = input_key_to_dir(ch);
-      if (dir != DIR_NONE && dir != last_dir) {
+      if (dir != DIR_NONE) { //&& dir != last_dir) {
         char dc = input_dir_to_char(dir); // 'U','D','L','R'
         client_send_dir(fd, dc);
-        last_dir = dir;
+        //last_dir = dir;
       }
     }
     usleep(10*1000); // 10ms
