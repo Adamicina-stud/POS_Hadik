@@ -58,7 +58,11 @@ int game_add_player(int client_id, const char *name) {
 void game_set_dir(int client_id, int dir) {
   for (int i = 0; i < player_count; i++) {
     if (players[i].client_id == client_id) {
+      if (players[i].dir == dir + 1 || players[i].dir == dir -1) {
+        break;
+      }
       players[i].dir = dir;
+      printf("Direction changed to: %d\n", players[i].dir);
       return;
     }
   }
@@ -68,7 +72,9 @@ void game_tick() {
   for (int player = 0; player < player_count; player++) {
     int last_x = players[player].head.x;
     int last_y = players[player].head.y;
-    printf("%d ", players[player].head.x);
+    printf("x: %d, y: %d\n\n", players[player].head.x, players[player].head.y);
+    printf("Direction: %d\n", players[player].dir);
+
     // Posunutie hlavy
     switch (players[player].dir) {
       case DIR_UP:
@@ -84,12 +90,33 @@ void game_tick() {
         players[player].head.x++;
         break;
     }
-    printf("%d \n", players[player].head.x);
+    
+    // Prechod na opacnu stranu hernej plochy
+    if (players[player].head.x <= -1) {
+      players[player].head.x = W - 1;
+      grid[players[player].head.x][players[player].head.y] = '@';
+    } else if (players[player].head.x >= W) {
+      players[player].head.x = 0;
+      grid[players[player].head.x][players[player].head.y] = '@';
+    }
+
+    if (players[player].head.y <= -1) {
+      players[player].head.y = H - 1;
+      grid[players[player].head.x][players[player].head.y] = '@';
+    } else if (players[player].head.y >= H) {
+      players[player].head.y = 0;
+      grid[players[player].head.x][players[player].head.y] = '@';
+    }
+
+    // Kolizie
     switch (grid[players[player].head.x][players[player].head.y]) {
       case '*':
         players[player].fruit_eaten++;
+        grid[players[player].head.x][players[player].head.y] = '@';
+        break;
       case '.':
         grid[players[player].head.x][players[player].head.y] = '@';
+        grid[last_x][last_y] = '.';
         break;
       case '#':
       case 'o':
@@ -123,60 +150,19 @@ void game_tick() {
       last_x = last_x_temp;
       last_y = last_y_temp;
     }
-  }
+  } 
 
-
-  for (int player = 0; player < player_count; player++) {
-
-    // Prechod na opacnu stranu hernej plochy
-    if (players[player].head.x <= -1) {
-      players[player].head.x = W - 1;
-      grid[players[player].head.x][players[player].head.y] = '@';
-    } else if (players[player].head.x >= W) {
-      players[player].head.x = 0;
-      grid[players[player].head.x][players[player].head.y] = '@';
-    }
-    
-    if (players[player].head.y <= -1 ) {
-      players[player].head.y = H - 1;
-      grid[players[player].head.x][players[player].head.y] = '@';
-    } else if (players[player].head.y >= H) {
-      players[player].head.y = 0;
-      grid[players[player].head.x][players[player].head.y] = '@';
-    }
-    /*
-    // Kolizia + posunutie hlavy
-    switch (grid[players[player].head.x][players[player].head.y]) {
-      case '*':
-        players[player].fruit_eaten++;
-      case '.':
-        grid[players[player].head.x][players[player].head.y] = '@';
-        break;
-      case '#':
-      case 'o':
-        game_remove_player_from_grid(player);
-        break;
-      default:
-        break;
-    }
-    */
-  }
-  
-  
-
-  if (fruit_count < 10) {
+  if (fruit_count < player_count) {
     game_add_fruit(10);
   }
 }
 
 int game_add_fruit(int num_of_attempts) {
   int num = 0;
-  int x = 0;
-  int y = 0;
 
   while (num < num_of_attempts) {
-    x = rand() % W;
-    y = rand() % H;
+    int x = rand() % W;
+    int y = rand() % H;
 
     if (grid[x][y] == '.') {
       grid[x][y] = '*';
@@ -192,9 +178,9 @@ int game_add_fruit(int num_of_attempts) {
 void game_build_grid(int walls) {
   for (int y = 0; y < H; y++) {
     for (int x = 0; x < W; x++) {
-      grid[y][x] = '.';
+      grid[x][y] = '.';
       if (walls == 1 && (y == 0 || y == H - 1 || x == 0 || x == W - 1)) {
-        grid[y][x] = '#';
+        grid[x][y] = '#';
       }
     }
   }
@@ -210,7 +196,7 @@ void game_send_grid_to_clients(int tick) {
     for (int y = 0; y < H; y++) {
       char line[W + 1];
       for (int x = 0; x < W; x++) {
-        line[x] = grid[y][x];
+        line[x] = grid[x][y];
         printf("%c", line[x]);                                                    // TEST
       }
       printf("\n");
@@ -218,7 +204,6 @@ void game_send_grid_to_clients(int tick) {
       //net_send_line(players[player].client_id, line);
     }
   }
-  printf("\n");
 }
 
 void game_remove_player_from_grid(int player_num) {

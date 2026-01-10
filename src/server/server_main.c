@@ -24,22 +24,38 @@ void *listen_for_input(void *arg) {
   
   while (1) {
     char line[256];
-    while (recv_line(data->client_fd, line, sizeof(line)) > 0 ) {
-      char dir;
-      if (sscanf(line, "DIR %c", &dir) == 1) {
-        pthread_mutex_lock(&data->mutex);
-
-        game_set_dir(data->client_fd, dir);
-
-        pthread_mutex_unlock(&data->mutex);
+    recv_line(data->client_fd, line, sizeof(line));
+    char dir;
+    printf("Line recieved!\n");
+    if (sscanf(line, "DIR %c", &dir) == 1) {
+      pthread_mutex_lock(&data->mutex);
+      int dir_int = 0;
+      switch (dir) {
+        case 'U':
+          dir_int = DIR_UP;
+          break;
+        case 'D':
+          dir_int = DIR_DOWN;
+          break;
+        case 'L':
+          dir_int = DIR_LEFT;
+          break;
+        case 'R':
+          dir_int = DIR_RIGHT;
+          break;
+        default:
+          break;
       }
+      game_set_dir(data->client_fd, dir_int);
+      printf("Direction changed: %d\n", dir_int);
+      pthread_mutex_unlock(&data->mutex);
     }
   }
   return NULL;
 }
 
 int main(int argc, char *argv[]) {
-  int tick = 1000000;  // 2 000 000 - 2 sekundy      200 000 - 0.2 sekundy
+  int tick = 1000000;  // 1 000 000 - 1 sekunda      100 000 - 0.1 sekundy
   int port = DEFAULT_PORT;
   char *c;
   if (argc >= 4) port = strtol(argv[3], &c, 10);
@@ -79,18 +95,19 @@ int main(int argc, char *argv[]) {
 
   printf("Grid %d x %d \n", width, height);
   printf("Server beží na porte %d...\n", port);
-  /*
+  
   //-------------- TEST ------------------
   game_add_player(1, "TEST");
-  
+  int directions[10] = {0, 0, 0, 0, 0, 0, 1, 3, 3, 3};
+
   for (int i = 0; i < 8; i++) {
     game_send_grid_to_clients(tick);
-
+    game_set_dir(1 ,directions[i]);
     game_tick();
   }
   return 0;
   //-------------- TEST ------------------
-  */
+  
   // Accept – čakáme na klienta
   int  client_fd = net_accept(listen_fd);
   if (client_fd < 0) {
