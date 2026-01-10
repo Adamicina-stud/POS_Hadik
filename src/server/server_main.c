@@ -1,3 +1,5 @@
+#include <asm-generic/errno-base.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,12 +24,13 @@ typedef struct {
 
 void *listen_for_input(void *arg) {
   thread_data_t *data = (thread_data_t *) arg;
+  printf("Input listener vytvoreny %d\n", data->client_fd);
   
   while (data->close == 0) {
     char line[256];
     recv_line(data->client_fd, line, sizeof(line));
     char dir;
-    printf("Line recieved!\n");
+    printf("Line recieved! %s\n", line);
 
     if (sscanf(line, "DIR %c", &dir) == 1) {
       pthread_mutex_lock(&data->mutex);
@@ -55,12 +58,15 @@ void *listen_for_input(void *arg) {
       game_set_dir(data->client_fd, dir_int);
       printf("Direction changed: %d\n", dir_int);
       pthread_mutex_unlock(&data->mutex);
+
     } else if (sscanf(line, "LEAVE") == 1) {
       pthread_mutex_lock(&data->mutex);
       game_remove_player_from_grid(data->client_fd);
       pthread_mutex_unlock(&data->mutex);
     }
   }
+
+  pthread_mutex_destroy(&data->mutex);
   return NULL;
 }
 
@@ -69,15 +75,14 @@ void *listen_for_join(void *arg) {
   thread_data_t *data = (thread_data_t *) arg;
   
   thread_data_t new_data[100];
+  //thread_data_t input_data[100]
   pthread_t new_input_thread[100];
   int new_threads_count = 0;
-  int test = 0;
+
   while (data->close == 0) {
     int client_fd = net_accept(data->listen_fd);
     if (client_fd < 0) {
-      printf("Klient nebol prijaty %d", client_fd);
-      if (test >= 2) return NULL;
-      test++;
+      if (errno == EINTR) continue;
       continue;
     }
     printf("Klient pripojeny!");
@@ -89,6 +94,22 @@ void *listen_for_join(void *arg) {
     
     pthread_mutex_lock(&data->mutex);
     game_add_player(client_fd, client_name);
+    
+    /*
+    thread_data_t* new_data = malloc(sizeof(*input_data));
+    if (!new_data) {
+      perror("malloc");
+      close(client_fd);
+      continue;
+    }
+
+    *new_data = (thread_data_t){
+      .client_fd = client_fd,
+      .listen_fd = data->listen_fd,
+      .close = 0,
+    };
+    pthread_mutex_init(&new_data->mutex, NULL);
+    */
 
     new_data[new_threads_count].mutex = data->mutex;
     new_data[new_threads_count].listen_fd = data->listen_fd;
@@ -96,13 +117,15 @@ void *listen_for_join(void *arg) {
     new_data[new_threads_count].close = 0;
 
 
-    pthread_create(&new_input_thread[new_threads_count], NULL, listen_for_input, &new_data);
+    pthread_create(&new_input_thread[new_threads_count], NULL, listen_for_input, &new_data[new_threads_count]);
     for (int i = 0; i < new_threads_count; i++) {
       if (new_data[i].close == 1) {
         pthread_join(new_input_thread[i], NULL);
         net_close(new_data[i].client_fd);
       }
     }
+    pthread_detach(new_input_thread[new_threads_count]);
+
     pthread_mutex_unlock(&data->mutex);
   }
   return NULL;
@@ -172,9 +195,7 @@ int main(int argc, char *argv[]) {
   game_init(width, height, time_score, mode, walls);
 
   printf("Grid %d x %d \n", width, height);
-  printf("Socket: %d\n", listen_fd);
   printf("Server beží na porte %d...\n", port);
-  printf("Socket: %d", listen_fd);
 
 
   /*
@@ -196,7 +217,7 @@ int main(int argc, char *argv[]) {
   
   thread_data_t join_listener_data;
   join_listener_data.client_fd = 0;
-  join_listener_data.listen_fd = 0;
+  join_listener_data.listen_fd = listen_fd;
   join_listener_data.close = 0;
   pthread_mutex_init(&join_listener_data.mutex, NULL);
 

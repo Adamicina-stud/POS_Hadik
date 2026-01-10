@@ -47,7 +47,6 @@ int net_accept(int listen_fd) {
   int client_fd = accept(listen_fd, NULL, NULL);
   if (client_fd < 0) {
     perror("accept");
-    close(listen_fd);
     return -1;
   }
   return client_fd;
