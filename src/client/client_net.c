@@ -54,31 +54,33 @@ int client_send_leave(int fd) {
     return send_line(fd, "LEAVE");
 }
 
-static int parse_state_line(const char *line, int *w, int *h, int *tick) {
+static int parse_state_line(const char *line, int *w, int *h, int *tick, int *score) {
     // vráti 1 ak OK, inak 0
-    int ww, hh, tt;
-    int ok = sscanf(line, "STATE %d %d %d", &ww, &hh, &tt);
+    int ww, hh, tt, ss;
+    int ok = sscanf(line, "STATE %d %d %d %d", &ww, &hh, &tt, &ss);
     if (ok != 3) return 0;
 
-    if (ww <= 0 || hh <= 0 || ww > GRID_MAX_W || hh > GRID_MAX_H) return 0;
+    if (ww <= 0 || hh <= 0 || ww > MAX_W || hh > MAX_H) return 0;
 
     if (w) *w = ww;
     if (h) *h = hh;
     if (tick) *tick = tt;
+    if (score) *score = ss;
     return 1;
 }
 
-int client_recv_frame(int fd, int *w, int *h, int *tick, char *grid_out, size_t grid_out_size) {
+int client_recv_frame(int fd, int *w, int *h, int *tick, int *score, char *grid_out, size_t grid_out_size) {
     if (!grid_out || grid_out_size == 0) return -1;
 
     char line[2048];
 
     // 1) STATE
+    //pridať čítanie score
     int n = recv_line(fd, line, sizeof(line));
     if (n == 0) return 0;       // server sa odpojil
     if (n < 0) return -1;
 
-    if (!parse_state_line(line, w, h, tick)) {
+    if (!parse_state_line(line, w, h, tick, score)) {
         fprintf(stderr, "Bad STATE line: %s", line);
         return -1;
     }

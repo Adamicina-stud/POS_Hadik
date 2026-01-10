@@ -7,7 +7,7 @@
 void ui_init(void);
 
 // Vykreslí frame: tick + grid (grid_out je buffer z client_recv_frame)
-void ui_draw(int w, int h, int tick, const char *grid_out);
+void ui_draw(int w, int h, int tick, int score, const char *grid_out);
 
 void ui_draw_waiting(void);
 

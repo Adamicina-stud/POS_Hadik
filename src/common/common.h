@@ -4,6 +4,8 @@
 //MVP nastavenia sveta
 #define GRID_W 40
 #define GRID_H 40
+#define MAX_H 200
+#define MAX_W 200
 
 //Sieť
 #define DEFAULT_PORT 5555
@@ -11,6 +13,7 @@
 
 //Herné smery
 typedef enum {
+  DIR_NONE = -1,
   DIR_UP = 0,
   DIR_DOWN = 1,
   DIR_LEFT = 2,

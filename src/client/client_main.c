@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,7 +19,7 @@ typedef struct {
   pthread_mutex_t mutex;
 
   int w, h, tick, score;
-  char grid[GRID_MAX_H * (GRID_MAX_W + 1)];
+  char grid[MAX_H * (MAX_W + 1)];
   int has_frame;
 
   int running;
@@ -32,8 +31,8 @@ static void *net_thread_fn(void *arg) {
   int fd = st->fd;
   
   //lokálne buffre (aby sme držali mutex čo najmenej)
-  int w = 0, h = 0, tick = 0;
-  char grid_buf[GRID_MAX_H * (GRID_MAX_W + 1)];
+  int w = 0, h = 0, tick = 0, score = 0;
+  char grid_buf[MAX_H * (MAX_W + 1)];
 
   while(1) {
     //kontrola či nastane koniec
@@ -42,7 +41,7 @@ static void *net_thread_fn(void *arg) {
     pthread_mutex_unlock(&st->mutex);
     if (!running) break;
 
-    int rc = client_recv_frame(fd, &w, &h, &tick, grid_buf, sizeof(grid_buf));
+    int rc = client_recv_frame(fd, &w, &h, &tick, &score, grid_buf, sizeof(grid_buf));
     if (rc <= 0) {
       //0 = server sa odpojil, -1 = chyba
       pthread_mutex_lock(&st->mutex);
@@ -57,6 +56,7 @@ static void *net_thread_fn(void *arg) {
     st->w = w;
     st->h = h;
     st->tick = tick;
+    memcpy(st->grid, grid_buf, sizeof(grid_buf));
     st->has_frame = 1;
     pthread_mutex_unlock(&st->mutex);
   }
@@ -115,9 +115,9 @@ int main(int argc, char **argv) {
   direction_t last_dir = DIR_NONE;
 
   // lokálne buffre pre UI (kreslenie bez držania mutexu)
-  int w = 0, h = 0, tick = 0;
+  int w = 0, h = 0, tick = 0, score = 0;
   // buffer na grid: (MAX_H * (MAX_W+1)) je bezpečné, lebo frame validuje MAX_W/MAX_H
-  static char grid_local[(GRID_MAX_H) * (GRID_MAX_W + 1)];
+  static char grid_local[(MAX_H) * (MAX_W + 1)];
   int have_local = 0;
 
   while (1) {
@@ -130,6 +130,7 @@ int main(int argc, char **argv) {
       w = st.w;
       h = st.h;
       tick = st.tick;
+      score = st.score;
       memcpy(grid_local, st.grid, sizeof(grid_local));
       have_local = 1;
     }
@@ -138,7 +139,7 @@ int main(int argc, char **argv) {
     if (!running || disconnected) break;
 
     if (have_local) {  //vykresli frame ak je
-      ui_draw(w, h, tick, grid_local);
+      ui_draw(w, h, tick, score, grid_local);
     } else {
       ui_draw_waiting();
     }
@@ -166,8 +167,6 @@ int main(int argc, char **argv) {
       }
     }
 
-    //malý sleep aby to nežralo CPU 
-    //usleep(16 * 1000); // ~60fps
   }
 
   // cleanup
