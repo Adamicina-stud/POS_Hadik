@@ -22,7 +22,7 @@ typedef struct {
   int has_frame;
   int running;
   int disconnected;
-
+  
   int ended;
   char end_reason[256];
 } client_state_t;
@@ -33,12 +33,13 @@ static void *net_thread_fn(void *arg) {
   
   //lokálne buffre (aby sme držali mutex čo najmenej)
   int w = 0, h = 0, tick = 0, score = 0;
+  int running = 0;
   char grid_buf[MAX_H * (MAX_W + 1)];
 
   while(1) {
     //kontrola či nastane koniec
     pthread_mutex_lock(&st->mutex);
-    int running = st->running;
+    running = st->running;
     pthread_mutex_unlock(&st->mutex);
     if (!running) break;
   
@@ -127,7 +128,7 @@ int main(int argc, char **argv) {
   //direction_t last_dir = DIR_NONE;
 
   // lokálne buffre pre UI (kreslenie bez držania mutexu)
-  int w = 0, h = 0, tick = 0, score = 0;
+  int w = 0, h = 0, tick = 0, score = 0, paused = 0;
   // buffer na grid: (MAX_H * (MAX_W+1)) je bezpečné, lebo frame validuje MAX_W/MAX_H
   static char grid_local[(MAX_H) * (MAX_W + 1)];
   int have_local = 0;
@@ -151,7 +152,7 @@ int main(int argc, char **argv) {
     if (!running || disconnected) break;
 
     if (have_local) {  //vykresli frame ak je
-      ui_draw(name , w, h, tick, score, grid_local);
+      ui_draw(name , w, h, tick, score, grid_local, paused);
     } else {
       ui_draw_waiting();
     }
@@ -171,6 +172,12 @@ int main(int argc, char **argv) {
         break;
       }
 
+      if (ch == 'p' || ch == 'P') {
+        client_send_dir(fd, 'P'); // Pošle p ako direction
+        paused = !paused;
+      }
+      
+      if (paused) continue;
       // mapuj kláves -> dir (DIR_NONE ak nič)
       direction_t dir = input_key_to_dir(ch);
       if (dir != DIR_NONE) { //&& dir != last_dir) {

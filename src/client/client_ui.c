@@ -19,7 +19,7 @@ void ui_init(void) {
     init_pair(2, COLOR_YELLOW, -1);  // hlava hada
     init_pair(3, COLOR_RED,    -1);  // jedlo
     init_pair(4, COLOR_BLUE,   -1);  // stena / border
-    init_pair(5, COLOR_CYAN,  -1);  // prázdno (alebo nechaj default) 
+    init_pair(5, COLOR_WHITE,  -1);  // prázdno (alebo nechaj default) 
   }
 }
 
@@ -29,10 +29,14 @@ int ui_get_key(void) {
   return ch;
 }
 
-void ui_draw(const char *name, int w, int h, int tick, int score, const char *grid_out) {
+void ui_draw(const char *name, int w, int h, int tick, int score, const char *grid_out, int paused) {
   // horný riadok: info
   erase();
-  mvprintw(1, 2, "%s", name);
+  if (paused) {
+    mvprintw(1, 2, "%s \t\t\tGAME PAUSED", name);
+  } else {
+    mvprintw(1, 2, "%s", name);
+  }
   mvprintw(2, 2, "Score: %d  Grid: %dx%d   (q=quit)", score, w, h);
 
   //rámik okolo obrazovky
@@ -63,32 +67,32 @@ void ui_draw(const char *name, int w, int h, int tick, int score, const char *gr
     for (int x = 0; x < w; x++) {
       char c = row[x];
 
-      chtype out_ch = ' ';
+      chtype out_ch = ACS_CKBOARD; //' ';
       int pair = 0;
 
       switch (c) {
         case '.':
-          out_ch = ' ';        // prázdno = medzera (vyzerá čistejšie)
+          //out_ch = ' ';        // prázdno = medzera (vyzerá čistejšie)
           pair = 5;
           break;
 
         case '*':
-          out_ch = ACS_DIAMOND; // jedlo
+          //out_ch = ACS_CKBOARD; //ACS_DIAMOND; // jedlo
           pair = 3;
           break;
 
         case '#':
-          out_ch = ACS_CKBOARD; // stena
+          //out_ch = ACS_CKBOARD; // stena
           pair = 4;
           break;
 
         case '@':              // hlava
-          out_ch = 'O';
+          //out_ch = ACS_CKBOARD; //'O';
           pair = 2;
           break;
 
         case 'o':              // telo
-          out_ch = 'o';
+          //out_ch = ACS_CKBOARD; //'o';
           pair = 1;
           break;
 
@@ -97,9 +101,13 @@ void ui_draw(const char *name, int w, int h, int tick, int score, const char *gr
           pair = 0;
           break;
       }
+      int yy = off_y + 2 + y;
+      int xx = off_x + 2 * x;
+
     
       if (pair && has_colors()) attron(COLOR_PAIR(pair));
-      mvaddch(off_y + 2 + y, off_x + x, out_ch); //k off_y + y možno bude chybať 2
+      mvaddch(yy, xx, out_ch);
+      mvaddch(yy, x + 1, out_ch); //vyplny druhý stlpec
       if (pair && has_colors()) attroff(COLOR_PAIR(pair));
     }
     clrtoeol(); // vymaže zvyšok riadku (keď sa skracuje)
