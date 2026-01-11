@@ -37,10 +37,11 @@ void *listen_for_input(void *arg) {
   
   while (data->close == 0) {
     char line[256];
+    printf("ready to recieve line\n");
     recv_line(data->client_fd, line, sizeof(line));
     char dir;
     pthread_mutex_lock(data->mutex);
-    //printf("Line recieved! %s\n", line);
+    printf("Line recieved! %s...\n", line);
 
     if (sscanf(line, "DIR %c", &dir) == 1) {
       printf("Direction: %s\n", line);
@@ -68,19 +69,17 @@ void *listen_for_input(void *arg) {
       game_set_dir(data->client_fd, dir_int);
     
     } else if (sscanf(line, "LEAVE") == 0) {
-      game_remove_player_from_grid(data->client_fd);
-      data->close = 1;
-      pthread_mutex_unlock(data->mutex);
-      break;
-    } else if (sscanf(line, "LIR %c", &dir) == 1) {
-      game_remove_player_from_grid(data->client_fd);
+      printf("Player is leaving\n");
       data->close = 1;
       pthread_mutex_unlock(data->mutex);
       break;
     }
+
     pthread_mutex_unlock(data->mutex);
   }
-
+  
+  printf("Ending\n");
+  game_remove_player_from_grid(data->client_fd);
   printf("Ending input thread %d\n", data->client_fd);
   return NULL;
 }
@@ -251,7 +250,7 @@ int main(int argc, char *argv[]) {
       // Zavre nepouzite thready
       if (input_data[i].close == 1) {
         printf("Joining thread of client %d\n", input_data[i].client_fd);
-        pthread_join(*input_data[i].thread, NULL);
+        //pthread_join(*input_data[i].thread, NULL);
         input_data[i].close = 0;
         input_data[i].client_fd = 0;
       }

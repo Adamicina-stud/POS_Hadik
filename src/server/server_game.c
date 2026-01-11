@@ -322,8 +322,12 @@ void game_remove_player_from_grid(int player_id) {
 
   players[player_num].head.x = -1;
   players[player_num].head.y = -1;
-
-  net_send_line(players[player_num].client_id, "END UMREL SI");
+  
+  if (players[player_num].client_id != 0) {
+    printf("Sending end line\n");
+    //net_send_line(players[player_num].client_id, "END UMREL SI");
+    
+  }
   //net_close(players[player_num].client_id);
   player_count--;
 }
@@ -361,6 +365,7 @@ int game_over() {
       }
       net_send_line(players[i].client_id, line);
       net_close(players[i].client_id);
+      players[i].client_id = 0;
     }
   }
 
