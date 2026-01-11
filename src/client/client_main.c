@@ -5,7 +5,6 @@
 #include <pthread.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <sys/socket.h>
 
 #include "client_net.h"
 #include "client_ui.h"

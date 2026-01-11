@@ -1,8 +1,8 @@
 #include "client_ui.h"
-#include "client_input.h"
+//#include "client_input.h"
 
 #include <ncurses.h>
-#include <string.h>
+//#include <string.h>
 
 void ui_init(void) {
   initscr();

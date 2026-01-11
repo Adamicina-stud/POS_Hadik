@@ -1,7 +1,7 @@
 #ifndef CLIENT_UI_H
 #define CLIENT_UI_H
 
-#include <stddef.h>
+//#include <stddef.h>
 
 // Inicializuje ncurses
 void ui_init(void);
