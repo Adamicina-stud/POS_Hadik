@@ -1,14 +1,9 @@
-#include <asm-generic/errno-base.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <string.h>
-
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
 
 #include "../common/common.h"
 #include "../common/protocol.h"
@@ -310,13 +305,14 @@ int main(int argc, char *argv[]) {
   //pthread_mutex_unlock(join_listener_data.mutex);
 
   for (int i = 0; i < MAX_PLAYERS; i++) {
-    if (input_data[i].close == 1 || i == 0) {
-      pthread_cancel(input_threads[i]);
+    if (input_threads[i] != 0) {
+      pthread_join(input_threads[i], NULL);
     }
   }
   
   pthread_join(listener_thread, NULL);
-  printf("joinol som litener thread."); 
+  printf("joinol som litener thread.");
+
   pthread_mutex_destroy(&mutex);
   net_close(listen_fd);
   printf("Ending server");

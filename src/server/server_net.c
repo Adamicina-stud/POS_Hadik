@@ -1,15 +1,15 @@
 #include "server_net.h"
 
-#include <arpa/inet.h>
+//#include <arpa/inet.h>
 #include <netinet/in.h>
-#include <sys/socket.h>
+//#include <sys/socket.h>
 #include <unistd.h>
 
 #include <stdio.h>
 #include <string.h>
 
 #include "../common/protocol.h"
-#include "../common/common.h"
+//#include "../common/common.h"
 
 int net_init(int port) {
   int fd = socket(AF_INET, SOCK_STREAM, 0);
