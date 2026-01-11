@@ -4,6 +4,7 @@
 #include <netinet/in.h>
 #include <stddef.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <stdio.h>
@@ -55,22 +56,26 @@ int client_send_leave(int fd) {
     return send_line(fd, "LEAVE");
 }
 
-static int parse_state_line(const char *line, int *w, int *h, int *tick, int *score) {
+static int parse_state_line(const char *line, int *w, int *h, int *paused, int *score, int *time) {
     // vráti 1 ak OK, inak 0
-    int ww, hh, tt, ss;
-    int ok = sscanf(line, "STATE %d %d %d %d", &ww, &hh, &tt, &ss);
-    if (ok != 4) return 0;
+    int ww, hh, pp, ss, tt;
+    int ok = sscanf(line, "STATE %d %d %d %d %d", &ww, &hh, &pp, &ss, &tt);
+    if (ok != 4) {
+    fprintf(stderr, "Nepodarilo sa prečítať STATE\n");
+    return 0;
+    }
 
     if (ww <= 0 || hh <= 0 || ww > MAX_W || hh > MAX_H) return 0;
 
     if (w) *w = ww;
     if (h) *h = hh;
-    if (tick) *tick = tt;
+    if (paused) *paused = pp;
     if (score) *score = ss;
+    if (time) *time = tt;
     return 1;
 }
 
-int client_recv_frame(int fd, int *w, int *h, int *tick, int *score, char *grid_out, size_t grid_out_size, char *end_reason, size_t end_reason_size) {
+int client_recv_frame(int fd, int *w, int *h, int *paused, int *score, int *time, char *grid_out, size_t grid_out_size, char *end_reason, size_t end_reason_size) {
     if (!grid_out || grid_out_size == 0) return -1;
 
     char line[2048];
@@ -94,8 +99,8 @@ int client_recv_frame(int fd, int *w, int *h, int *tick, int *score, char *grid_
     return 2; // špeciálne: hra skončila
 }
 
-    if (!parse_state_line(line, w, h, tick, score)) {
-        fprintf(stderr, "Bad STATE line: %s", line);
+    if (!parse_state_line(line, w, h, paused, score, time)) {
+        fprintf(stderr, "Bad STATE line: %s\n", line);
         return -1;
     }
 
@@ -105,7 +110,7 @@ int client_recv_frame(int fd, int *w, int *h, int *tick, int *score, char *grid_
     if (n < 0) return -1;
 
     if (strncmp(line, "GRID", 4) != 0) {
-        fprintf(stderr, "Expected GRID, got: %s", line);
+        fprintf(stderr, "Expected GRID, got: %s\n", line);
         return -1;
     }
 

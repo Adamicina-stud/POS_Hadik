@@ -1,4 +1,5 @@
 #include "client_ui.h"
+#include "client_input.h"
 
 #include <ncurses.h>
 #include <string.h>
@@ -29,15 +30,21 @@ int ui_get_key(void) {
   return ch;
 }
 
-void ui_draw(const char *name, int w, int h, int tick, int score, const char *grid_out, int paused) {
+void ui_draw(const char *name, int w, int h, int paused, int score, int time, const char *grid_out) {
   // horný riadok: info
   erase();
-  if (paused) {
+  if (paused >= 3) {
     mvprintw(1, 2, "%s \t\t\tGAME PAUSED", name);
-  } else {
+  }
+  else if (paused > 0) {
+    mvprintw(1, 2, "%s \t\t\t     %d", name, paused);
+  }
+  else {
     mvprintw(1, 2, "%s", name);
   }
-  mvprintw(2, 2, "Score: %d  Grid: %dx%d   (q=quit)", score, w, h);
+  mvprintw(2, 2, 
+           "Time: %d  Score: %d  Grid: %dx%d   (q=quit)", 
+           time, score, w, h);
 
   //rámik okolo obrazovky
   if (has_colors()) attron(COLOR_PAIR(4));
@@ -107,7 +114,7 @@ void ui_draw(const char *name, int w, int h, int tick, int score, const char *gr
     
       if (pair && has_colors()) attron(COLOR_PAIR(pair));
       mvaddch(yy, xx, out_ch);
-      mvaddch(yy, x + 1, out_ch); //vyplny druhý stlpec
+      mvaddch(yy, xx + 1, out_ch); //vyplny druhý stlpec
       if (pair && has_colors()) attroff(COLOR_PAIR(pair));
     }
     clrtoeol(); // vymaže zvyšok riadku (keď sa skracuje)
