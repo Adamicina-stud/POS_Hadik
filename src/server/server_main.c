@@ -1,9 +1,10 @@
+#include <asm-generic/errno-base.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
 #include <pthread.h>
+#include <string.h>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -36,24 +37,22 @@ void *listen_for_input(void *arg) {
   
   while (data->close == 0) {
     char line[256];
+    printf("ready to recieve line\n");
     int rc = recv_line(data->client_fd, line, sizeof(line));
-    char dir;
 
-    pthread_mutex_lock(data->mutex);
-    printf("Line recieved! %s...\n", line);
-    
-    if(rc <= 0) {
-      printf("Klient sa odpojil\n");
-      game_remove_player_from_grid(data->client_fd);
-      pthread_mutex_unlock(data->mutex);
+    if (rc <= 0) {
+      printf("klient sa odpojil ticho (EOF) alebo chyba");
       break;
     }
+    char dir;
+    pthread_mutex_lock(data->mutex);
+    printf("Line recieved! %s...\n", line);
 
     if (sscanf(line, "DIR %c", &dir) == 1) {
       printf("Direction: %s\n", line);
       int dir_int = DIR_NONE;
       switch (dir) {
-        case 'U':  
+        case 'U':
           dir_int = DIR_UP;
           break;
         case 'D':
@@ -73,25 +72,19 @@ void *listen_for_input(void *arg) {
           break;
       }
       game_set_dir(data->client_fd, dir_int);
+    
     } else if (strcmp(line, "LEAVE") == 0) {
       printf("Player is leaving\n");
-      game_remove_player_from_grid(data->client_fd);
       data->close = 1;
       pthread_mutex_unlock(data->mutex);
-      net_close(data->client_fd);
+      //net_close(data->client_fd); // zavri len jeho socket
       break;
     }
-    /*
-    } else if (sscanf(line, "LEAVE") == 0) {
-      printf("Player is leaving\n");
-      data->close = 1;
-      pthread_mutex_unlock(data->mutex);
-      break;
-    }
-    */
+
     pthread_mutex_unlock(data->mutex);
   }
   
+  printf("Ending\n");
   game_remove_player_from_grid(data->client_fd);
   printf("Ending input thread %d\n", data->client_fd);
   return NULL;
@@ -118,7 +111,8 @@ void *listen_for_join(void *arg) {
     
     //pthread_mutex_lock(data->mutex);
     game_add_player(client_fd, client_name);
-    
+
+
     // Zisti ci v hre je max hracov
     int free_player_spot = 0;
     for (int i = 0; i < MAX_PLAYERS; i++) {
@@ -237,10 +231,11 @@ int main(int argc, char *argv[]) {
     input_data[i].close = 0;
   }
 
+  
 
   // Game loop
-  int game_ended = 0;
-  while (game_ended == 0) {
+  int game_ended = 10;
+  while (1) {
     pthread_mutex_lock(join_listener_data.mutex);
     
     // Vytvori nove thready pre input
@@ -263,31 +258,44 @@ int main(int argc, char *argv[]) {
       // Zavre nepouzite thready
       if (input_data[i].close == 1) {
         printf("Joining thread of client %d\n", input_data[i].client_fd);
-        pthread_join(*input_data[i].thread, NULL);
+        //pthread_join(*input_data[i].thread, NULL);
         input_data[i].close = 0;
         input_data[i].client_fd = 0;
       }
     }
-    
+    pthread_mutex_unlock(join_listener_data.mutex); // to je ten dole zakomentovany
+
     game_tick();
 
-    game_send_grid_to_clients(tick); 
+    game_send_grid_to_clients(tick);  
 
-    game_ended = game_over();
-
-    pthread_mutex_unlock(join_listener_data.mutex);
-    
+    //pthread_mutex_unlock(join_listener_data.mutex);
+    printf("ZASPAVAM.\n");
     sleep(1);
+    printf("ZOBUDZAM SA.\n");
+
+    int temp = get_player_count();
+    printf("Počet hráčov: %d\n", temp);
+    if (temp <= 0) {
+      printf("ukončujem hru.\n");
+      //game_over();
+      pthread_mutex_lock(join_listener_data.mutex);
+      join_listener_data.close = 1;
+      pthread_mutex_unlock(join_listener_data.mutex);
+      printf("Ukončil som hru.\n");
+      break;
+    }
   }
+  printf("Vyšiel som z while.");
   
-  pthread_mutex_lock(join_listener_data.mutex);
-  join_listener_data.close = 1;
-  pthread_mutex_unlock(join_listener_data.mutex);
+  //pthread_mutex_lock(join_listener_data.mutex);
+  //join_listener_data.close = 1;
+  //pthread_mutex_unlock(join_listener_data.mutex);
   
   pthread_join(listener_thread, NULL);
+  printf("joinol som litener thread."); 
 
   net_close(listen_fd);
   printf("Ending server");
   return 0;
 }
-

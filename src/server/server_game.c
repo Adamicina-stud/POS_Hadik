@@ -29,23 +29,32 @@ typedef struct {
 static int W, H;
 static player_t players[MAX_PLAYERS];
 static int player_count = 0;
+static int first_player_joined = 0;
 static char grid[MAX_H][MAX_W];
 static int fruit_count = 0;                     // ammount of fruit currently on the map
 static int mode = 0;                            // 0 - score mode; 1 - timed mode
 static int winner = 0;
 static int total_time = 0;
-static int max_score = 0;
-static int elapsed_time = 0;
+static int elapsed_time = 0;                    // total_time - time
 
-void game_init(int width, int height, int time_score, int p_mode, int p_walls) {
+void game_init(int width, int height, int time, int p_mode, int p_walls) {
   W = width;
   H = height;
   player_count = 0;
-  total_time = time_score;
-  max_score = time_score;
-  elapsed_time = 0;
+  total_time = time;
+  if (time > 0) {
+    elapsed_time = time;
+  } else {
+    elapsed_time = 0;
+  }
   mode = p_mode;
   game_build_grid(p_walls);
+}
+
+int get_player_count() {
+  printf("Realny počet hračov: %d\n", player_count);
+  if (first_player_joined == 0) return 1;
+  return player_count;
 }
 
 int game_add_player(int client_id, const char *name) {
@@ -64,6 +73,9 @@ int game_add_player(int client_id, const char *name) {
   for (int segment = 0; segment < 256; segment++) {
     players[player_count].body[segment].x = -1;
     players[player_count].body[segment].y = -1;
+  }
+  if (first_player_joined == 0) {
+    first_player_joined++;
   }
   player_count++;
   printf("Pripojil sa novy hrac! Pocet hracov: %d\n", player_count);
@@ -129,7 +141,11 @@ void game_set_dir(int client_id, int dir) {
 }
 
 void game_tick() {
-  elapsed_time++;
+  if(total_time > 0) {
+    elapsed_time--;
+  } else {
+    elapsed_time++;
+  }
   for (int player = 0; player < player_count; player++) {
     // Hrac pauzol hru
     if (players[player].dir == DIR_NONE) {
@@ -282,46 +298,56 @@ void game_send_grid_to_clients(int tick) {
 }
 
 void game_remove_player_from_grid(int player_id) {
-  // Najde hraca
-  int player_num = -1;
+  // nájdi index hráča podľa client_id
+  int idx = -1;
   for (int i = 0; i < player_count; i++) {
     if (players[i].client_id == player_id) {
-      player_num = i;
+      idx = i;
       break;
     }
   }
+  if (idx == -1) return;
 
-  if (player_num == -1) {
-    return;
-  }
-  
-  // Odstrani hlavu 
-  if (grid[players[player_num].head.x][players[player_num].head.y] == '@') {
-    grid[players[player_num].head.x][players[player_num].head.y] = '.';
+  // vymaž hlavu z gridu (bezpečne v rozsahu)
+  int hx = players[idx].head.x;
+  int hy = players[idx].head.y;
+  if (hx >= 0 && hx < W && hy >= 0 && hy < H) {
+    if (grid[hx][hy] == '@') grid[hx][hy] = '.';
   }
 
-  // Odstrani telo
-  for (int segment = 0; segment < 256; segment++) {
-    if (players[player_num].body[segment].x == -1) {
-      break;
+  // vymaž telo
+  for (int s = 0; s < 256; s++) {
+    int bx = players[idx].body[s].x;
+    int by = players[idx].body[s].y;
+    if (bx == -1) break;
+
+    if (bx >= 0 && bx < W && by >= 0 && by < H) {
+      if (grid[bx][by] == 'o') grid[bx][by] = '.';
+      else if (grid[bx][by] == '@') grid[bx][by] = '.';
     }
 
-    grid[players[player_num].body[segment].x][players[player_num].body[segment].y] = '.';
-
-    players[player_num].body[segment].x = -1;
-    players[player_num].body[segment].y = -1;
+    players[idx].body[s].x = -1;
+    players[idx].body[s].y = -1;
   }
 
-  players[player_num].head.x = -1;
-  players[player_num].head.y = -1;
-  
-  if (players[player_num].client_id != 0) {
-    printf("Sending end line\n");
-    //net_send_line(players[player_num].client_id, "END UMREL SI");
-    
+  players[idx].head.x = -1;
+  players[idx].head.y = -1;
+
+  // zavri socket iba tohto hráča
+  if (players[idx].client_id != 0) {
+    net_close(players[idx].client_id);
   }
-  net_close(players[player_num].client_id);
+
+  // SWAP-REMOVE: posledného hráča presuň na miesto odstráneného
+  // (aby pole ostalo kompaktné a player_count sedel)
+  int last = player_count - 1;
+  if (idx != last) {
+    players[idx] = players[last];
+  }
+
+  // zníž počet hráčov
   player_count--;
+  printf("Hráč sa odpojil. Počet hráčov: %d\n", player_count);
 }
 
 int game_over() {
@@ -330,14 +356,13 @@ int game_over() {
   // 1 - vyprsal cas
   if (mode == 0) {
     for (int i = 0; i < player_count; i++) {
-      if (players[i].score >= max_score && elapsed_time > 5) {
+      if (players[i].score >= 100) {
         winner = i;
         game_end = 1;
       }
     }
-  }
-  if (mode == 1) {
-    if (elapsed_time >= total_time) {
+  } else if (total_time > 0) {
+    if (elapsed_time <= 0) {
       int highest_score = 0;
       for (int i = 0; i < player_count; i++) {
         if (players[i].score > highest_score) {
@@ -347,7 +372,8 @@ int game_over() {
       }
     }
   }
-
+  
+  /*
   if (game_end == 1) {
     for (int i = 0; i < player_count; i++) {
       char line[MAX_NAME_LEN + 10] = "END ";
@@ -361,6 +387,7 @@ int game_over() {
       players[i].client_id = 0;
     }
   }
+*/
 
   return game_end;
 }

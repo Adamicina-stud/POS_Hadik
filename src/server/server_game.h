@@ -1,9 +1,10 @@
-
 #ifndef SERVER_GAME_H
 #define SERVER_GAME_H
 
 // Inicializácia hry
 void game_init(int width, int height, int time, int p_mode, int p_walls);
+
+int get_player_count();
 
 // Pridanie hráča (JOIN)
 // client_id je napr. client_fd
