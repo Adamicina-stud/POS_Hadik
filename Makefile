@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Wextra -std=c11 -O2 -pthread
+CFLAGS = -Wall -Wextra -std=c11 -O2 -pthread
 INCLUDES=-Isrc -Isrc/common -Isrc/server -Isrc/client
 
 COMMON_SRCS=src/common/protocol.c

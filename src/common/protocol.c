@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
-#include <stdlib.h>
+//#include <stdlib.h>
 
 int send_all(int fd, const void *buf, size_t len) {
     const char *p = (const char*)buf;
