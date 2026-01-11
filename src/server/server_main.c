@@ -21,6 +21,7 @@ typedef struct {
   int client_fd[MAX_PLAYERS];
   int close;
   int create_these_client_fds[MAX_PLAYERS];
+  game_data *game;
 } thread_data_t;
 
 typedef struct {
@@ -29,6 +30,7 @@ typedef struct {
   int client_fd;
   int close;
   pthread_t *thread;
+  game_data *game;
 } input_thread_data_t;
 
 void *listen_for_input(void *arg) {
@@ -71,7 +73,7 @@ void *listen_for_input(void *arg) {
           dir_int = DIR_NONE;
           break;
       }
-      game_set_dir(data->client_fd, dir_int);
+      game_set_dir(data->client_fd, dir_int, data->game);
     
     } else if (strcmp(line, "LEAVE") == 0) {
       printf("Player is leaving\n");
@@ -85,7 +87,7 @@ void *listen_for_input(void *arg) {
   }
   
   printf("Ending\n");
-  game_remove_player_from_grid(data->client_fd);
+  game_remove_player_from_grid(data->client_fd, data->game);
   printf("Ending input thread %d\n", data->client_fd);
   return NULL;
 }
@@ -110,7 +112,7 @@ void *listen_for_join(void *arg) {
     printf("Od klienta: %s", client_name);
     
     //pthread_mutex_lock(data->mutex);
-    game_add_player(client_fd, client_name);
+    game_add_player(data->game, client_fd, client_name);
 
 
     // Zisti ci v hre je max hracov
@@ -195,8 +197,10 @@ int main(int argc, char *argv[]) {
   if (argc >= 7) {
     walls = strtol(argv[6], &c, 10);
   }
+  
+  game_data g;
 
-  game_init(width, height, time_score, mode, walls);
+  game_init(width, height, time_score, mode, walls, &g);
 
   printf("Grid %d x %d \n", width, height);
   printf("Server beží na porte %d...\n", port);
@@ -212,6 +216,7 @@ int main(int argc, char *argv[]) {
   pthread_mutex_t mutex;
   pthread_mutex_init(&mutex, NULL);
   join_listener_data.mutex = &mutex;
+  join_listener_data.game = &g;
 
   pthread_t listener_thread;
   if (pthread_create(&listener_thread, NULL, listen_for_join, &join_listener_data) != 0) {
@@ -229,12 +234,13 @@ int main(int argc, char *argv[]) {
     input_data[i].mutex = &mutex;
     input_data[i].listen_fd = listen_fd;
     input_data[i].close = 0;
+    input_data[i].game = &g;
   }
 
   
 
   // Game loop
-  int game_ended = 10;
+  //int game_ended = 10;
   while (1) {
     pthread_mutex_lock(join_listener_data.mutex);
     
@@ -265,16 +271,16 @@ int main(int argc, char *argv[]) {
     }
     pthread_mutex_unlock(join_listener_data.mutex); // to je ten dole zakomentovany
 
-    game_tick();
+    game_tick(&g);
 
-    game_send_grid_to_clients(tick);  
+    game_send_grid_to_clients(tick, &g);  
 
     //pthread_mutex_unlock(join_listener_data.mutex);
     printf("ZASPAVAM.\n");
     sleep(1);
     printf("ZOBUDZAM SA.\n");
 
-    int temp = get_player_count();
+    int temp = get_player_count(&g);
     printf("Počet hráčov: %d\n", temp);
     if (temp <= 0) {
       printf("ukončujem hru.\n");
