@@ -25,12 +25,18 @@ void game_init(int width, int height, int time, int p_mode, int p_walls, game_da
   g->H = height;
   g->player_count = 0;
   g->total_time = time;
+  g->first_player_joined = 0;
+  g->fruit_count = 0;
+  g->winner = 0;
   if (time > 0) {
     g->elapsed_time = time;
   } else {
     g->elapsed_time = 0;
   }
   g->mode = p_mode;
+  for (int i = 0; i < MAX_PLAYERS; i++) {
+    g->players[i].score = 0;
+  }
   game_build_grid(p_walls, g);
 }
 
@@ -339,13 +345,13 @@ int game_over(game_data *g) {
   // 0 - dosiahnute max skore
   // 1 - vyprsal cas
   if (g->mode == 0) {
-    for (int i = 0; i < g->player_count; i++) {
+    for (int i = 0; i < MAX_PLAYERS; i++) {
       if (g->players[i].score >= 100) {
         g->winner = i;
         game_end = 1;
       }
     }
-  } else if (g->total_time > 0) {
+  } else if (g->mode == 1) {
     if (g->elapsed_time <= 0) {
       int highest_score = 0;
       for (int i = 0; i < g->player_count; i++) {
@@ -357,21 +363,21 @@ int game_over(game_data *g) {
     }
   }
   
-  /*
+  
   if (game_end == 1) {
-    for (int i = 0; i < player_count; i++) {
+    for (int i = 0; i < g->player_count; i++) {
       char line[MAX_NAME_LEN + 10] = "END ";
-      if (players[i].name == players[winner].name) {
+      if (g->players[i].name == g->players[g->winner].name) {
         strcat(line, "VYHRAL SI");
       } else {
         strcat(line, "PREHRAL SI");
       }
-      net_send_line(players[i].client_id, line);
-      net_close(players[i].client_id);
-      players[i].client_id = 0;
+      net_send_line(g->players[i].client_id, line);
+      net_close(g->players[i].client_id);
+      g->players[i].client_id = 0;
     }
   }
-*/
+
 
   return game_end;
 }

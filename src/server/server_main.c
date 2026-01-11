@@ -240,7 +240,7 @@ int main(int argc, char *argv[]) {
   
 
   // Game loop
-  //int game_ended = 10;
+  int game_end_in = 10;
   while (1) {
     pthread_mutex_lock(join_listener_data.mutex);
     
@@ -264,7 +264,7 @@ int main(int argc, char *argv[]) {
       // Zavre nepouzite thready
       if (input_data[i].close == 1) {
         printf("Joining thread of client %d\n", input_data[i].client_fd);
-        //pthread_join(*input_data[i].thread, NULL);
+        pthread_join(*input_data[i].thread, NULL);
         input_data[i].close = 0;
         input_data[i].client_fd = 0;
       }
@@ -281,15 +281,26 @@ int main(int argc, char *argv[]) {
     printf("ZOBUDZAM SA.\n");
 
     int temp = get_player_count(&g);
+    int game_finished = game_over(&g);
     printf("Počet hráčov: %d\n", temp);
-    if (temp <= 0) {
-      printf("ukončujem hru.\n");
-      //game_over();
-      pthread_mutex_lock(join_listener_data.mutex);
-      join_listener_data.close = 1;
-      pthread_mutex_unlock(join_listener_data.mutex);
-      printf("Ukončil som hru.\n");
-      break;
+    if (temp <= 0 || game_finished == 1) {
+      if (game_end_in <= 0 || g.mode == 1 || game_finished == 1) {
+        printf("ukončujem hru.\n");
+        //game_over();
+        pthread_mutex_lock(join_listener_data.mutex);
+        join_listener_data.close = 1;
+
+        pthread_cancel(listener_thread);
+        
+        pthread_mutex_unlock(join_listener_data.mutex);
+        printf("Ukončil som hru.\n");
+        //return 0;
+        break;
+      }
+      printf("Game ends in: %d\n", game_end_in);
+      game_end_in--;
+    } else {
+      game_end_in = 10;
     }
   }
   printf("Vyšiel som z while.");
@@ -297,10 +308,16 @@ int main(int argc, char *argv[]) {
   //pthread_mutex_lock(join_listener_data.mutex);
   //join_listener_data.close = 1;
   //pthread_mutex_unlock(join_listener_data.mutex);
+
+  for (int i = 0; i < MAX_PLAYERS; i++) {
+    if (input_data[i].close == 1 || i == 0) {
+      pthread_cancel(input_threads[i]);
+    }
+  }
   
   pthread_join(listener_thread, NULL);
   printf("joinol som litener thread."); 
-
+  pthread_mutex_destroy(&mutex);
   net_close(listen_fd);
   printf("Ending server");
   return 0;
