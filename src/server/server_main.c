@@ -39,10 +39,10 @@ void *listen_for_input(void *arg) {
     recv_line(data->client_fd, line, sizeof(line));
     char dir;
     pthread_mutex_lock(data->mutex);
-    printf("Line recieved! %s\n", line);
+    //printf("Line recieved! %s\n", line);
 
     if (sscanf(line, "DIR %c", &dir) == 1) {
-      //pthread_mutex_lock(data->mutex);
+      printf("Direction: %s\n", line);
       int dir_int = DIR_NONE;
       switch (dir) {
         case 'U':
@@ -66,16 +66,17 @@ void *listen_for_input(void *arg) {
       }
       game_set_dir(data->client_fd, dir_int);
       printf("Direction changed: %d\n", dir_int);
-      //pthread_mutex_unlock(data->mutex);
-
+    
     } else if (sscanf(line, "LEAVE") == 1) {
-      //pthread_mutex_lock(data->mutex);
       game_remove_player_from_grid(data->client_fd);
-      //pthread_mutex_unlock(data->mutex);
+      data->close = 1;
+    } else if (sscanf(line, "LIR %c", &dir) == 1) {
+      game_remove_player_from_grid(data->client_fd);
+      data->close = 1;
     }
     pthread_mutex_unlock(data->mutex);
   }
-
+  printf("Ending join thread %d\n", data->client_fd);
   pthread_mutex_destroy(data->mutex);
   return NULL;
 }
@@ -83,11 +84,6 @@ void *listen_for_input(void *arg) {
 
 void *listen_for_join(void *arg) {
   thread_data_t *data = (thread_data_t *) arg;
-  
-  //thread_data_t new_data[100];
-  //thread_data_t input_data[100]
-  //pthread_t new_input_thread[100];
-  //int new_threads_count = 0;
 
   while (data->close == 0) {
     int client_fd = net_accept(data->listen_fd);
@@ -124,45 +120,13 @@ void *listen_for_join(void *arg) {
       continue;
     }
 
-    /*
-    thread_data_t* new_data = malloc(sizeof(*input_data));
-    if (!new_data) {
-      perror("malloc");
-      close(client_fd);
-      continue;
-    }
-
-    *new_data = (thread_data_t){
-      .client_fd = client_fd,
-      .listen_fd = data->listen_fd,
-      .close = 0,
-    };
-    pthread_mutex_init(&new_data->mutex, NULL);
-    */
-
-    /* Skusim dat do main threadu
-    new_data[new_threads_count].mutex = data->mutex;
-    new_data[new_threads_count].listen_fd = data->listen_fd;
-    new_data[new_threads_count].client_fd = client_fd;
-    new_data[new_threads_count].close = 0;
-
-
-    pthread_create(&new_input_thread[new_threads_count], NULL, listen_for_input, &new_data[new_threads_count]);
-    for (int i = 0; i < new_threads_count; i++) {
-      if (new_data[i].close == 1) {
-        pthread_join(new_input_thread[i], NULL);
-        net_close(new_data[i].client_fd);
-      }
-    }
-    pthread_detach(new_input_thread[new_threads_count]);
-    */
     pthread_mutex_unlock(data->mutex);
   }
   return NULL;
 }
 
 
-// argumenty: 
+// argumenty v poradi: 
 // sirka, vyska, port, 
 // max_cas/max_skore: 0 - bez casu/skore, X - hra sa do X casu/skore
 // mod_hry: 0 - skore, 1 - cas 
@@ -227,26 +191,8 @@ int main(int argc, char *argv[]) {
   printf("Grid %d x %d \n", width, height);
   printf("Server beží na porte %d...\n", port);
 
-
-  /*
-  //-------------- TEST ------------------
-  game_add_player(1, "TEST");
-  int directions[10] = {0, 0, 0, 0, 0, 0, 1, 3, 3, 3};
-
-  for (int i = 0; i < 8; i++) {
-    game_send_grid_to_clients(tick);
-    game_set_dir(1 ,directions[i]);
-    game_tick();
-  }
-  char a[2000] = "GAME OVER! WINNER ";
-  strcat(a, game_get_winner());
-  printf(a);
-  return 0;
-  //-------------- TEST ------------------
-  */ 
-  
+  // Vytvorenie threadu ktory pocuna pre JOIN spravu
   thread_data_t join_listener_data;
-  //join_listener_data.client_fd = 0;
   join_listener_data.listen_fd = listen_fd;
   join_listener_data.close = 0;
   for (int i = 0; i < MAX_PLAYERS; i++) {
@@ -275,44 +221,6 @@ int main(int argc, char *argv[]) {
     input_data[i].close = 0;
   }
 
-  /*
-  // Accept – čakáme na klienta
-  int  client_fd = net_accept(listen_fd);
-  if (client_fd < 0) {
-    fprintf(stderr, "Klient nebol prijaty");
-    net_close(listen_fd);
-    return 1;
-  }
-  printf("Klient pripojený!\n");
-
-
-  // Prečítame správu od klienta (JOIN)
-  char client_name[256];
-  recv_line(client_fd, client_name, sizeof(client_name));
-  printf("Od klienta: %s", client_name);
-  
-
-  game_add_player(client_fd, client_name);
- 
-
-  // Vytvorenie threadu
-  thread_data_t thread_data;
-  thread_data.client_fd = client_fd;
-  thread_data.listen_fd = listen_fd;
-  thread_data.close = 0;
-  pthread_mutex_init(&thread_data.mutex, NULL);
-  
-  
-  pthread_t input_thread;
-  if (pthread_create(&input_thread, NULL, listen_for_input, &thread_data) != 0) {
-    fprintf(stderr, "Nepodarilo sa vytvorit listen thread");
-    net_close(client_fd);
-    net_close(listen_fd);
-    pthread_mutex_destroy(&thread_data.mutex);
-    return 1;
-  }
-  */
-
 
   // Game loop
   int game_ended = 0;
@@ -334,6 +242,11 @@ int main(int argc, char *argv[]) {
         }
 
         join_listener_data.create_these_client_fds[i] = 0;
+      }
+
+      // Zavre nepouzite thready
+      if (input_data[i].close == 1) {
+        pthread_join(input_threads[i], NULL);
       }
     }
     
