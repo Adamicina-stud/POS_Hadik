@@ -1,9 +1,8 @@
-#include <asm-generic/errno-base.h>
-#include <bits/pthreadtypes.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include <pthread.h>
 
 #include <arpa/inet.h>
@@ -37,17 +36,24 @@ void *listen_for_input(void *arg) {
   
   while (data->close == 0) {
     char line[256];
-    printf("ready to recieve line\n");
-    recv_line(data->client_fd, line, sizeof(line));
+    int rc = recv_line(data->client_fd, line, sizeof(line));
     char dir;
+
     pthread_mutex_lock(data->mutex);
     printf("Line recieved! %s...\n", line);
+    
+    if(rc <= 0) {
+      printf("Klient sa odpojil\n");
+      game_remove_player_from_grid(data->client_fd);
+      pthread_mutex_unlock(data->mutex);
+      break;
+    }
 
     if (sscanf(line, "DIR %c", &dir) == 1) {
       printf("Direction: %s\n", line);
       int dir_int = DIR_NONE;
       switch (dir) {
-        case 'U':
+        case 'U':  
           dir_int = DIR_UP;
           break;
         case 'D':
@@ -67,18 +73,25 @@ void *listen_for_input(void *arg) {
           break;
       }
       game_set_dir(data->client_fd, dir_int);
-    
+    } else if (strcmp(line, "LEAVE") == 0) {
+      printf("Player is leaving\n");
+      game_remove_player_from_grid(data->client_fd);
+      data->close = 1;
+      pthread_mutex_unlock(data->mutex);
+      net_close(data->client_fd);
+      break;
+    }
+    /*
     } else if (sscanf(line, "LEAVE") == 0) {
       printf("Player is leaving\n");
       data->close = 1;
       pthread_mutex_unlock(data->mutex);
       break;
     }
-
+    */
     pthread_mutex_unlock(data->mutex);
   }
   
-  printf("Ending\n");
   game_remove_player_from_grid(data->client_fd);
   printf("Ending input thread %d\n", data->client_fd);
   return NULL;
@@ -250,7 +263,7 @@ int main(int argc, char *argv[]) {
       // Zavre nepouzite thready
       if (input_data[i].close == 1) {
         printf("Joining thread of client %d\n", input_data[i].client_fd);
-        //pthread_join(*input_data[i].thread, NULL);
+        pthread_join(*input_data[i].thread, NULL);
         input_data[i].close = 0;
         input_data[i].client_fd = 0;
       }

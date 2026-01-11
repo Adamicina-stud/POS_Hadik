@@ -34,18 +34,16 @@ static int fruit_count = 0;                     // ammount of fruit currently on
 static int mode = 0;                            // 0 - score mode; 1 - timed mode
 static int winner = 0;
 static int total_time = 0;
-static int elapsed_time = 0;                    // total_time - time
+static int max_score = 0;
+static int elapsed_time = 0;
 
-void game_init(int width, int height, int time, int p_mode, int p_walls) {
+void game_init(int width, int height, int time_score, int p_mode, int p_walls) {
   W = width;
   H = height;
   player_count = 0;
-  total_time = time;
-  if (time > 0) {
-    elapsed_time = time;
-  } else {
-    elapsed_time = 0;
-  }
+  total_time = time_score;
+  max_score = time_score;
+  elapsed_time = 0;
   mode = p_mode;
   game_build_grid(p_walls);
 }
@@ -131,11 +129,7 @@ void game_set_dir(int client_id, int dir) {
 }
 
 void game_tick() {
-  if(total_time > 0) {
-    elapsed_time--;
-  } else {
-    elapsed_time++;
-  }
+  elapsed_time++;
   for (int player = 0; player < player_count; player++) {
     // Hrac pauzol hru
     if (players[player].dir == DIR_NONE) {
@@ -289,7 +283,7 @@ void game_send_grid_to_clients(int tick) {
 
 void game_remove_player_from_grid(int player_id) {
   // Najde hraca
-  int player_num = 0;
+  int player_num = -1;
   for (int i = 0; i < player_count; i++) {
     if (players[i].client_id == player_id) {
       player_num = i;
@@ -297,12 +291,10 @@ void game_remove_player_from_grid(int player_id) {
     }
   }
 
-  /*
-  if (player_num == 0) {
+  if (player_num == -1) {
     return;
   }
-  */
-
+  
   // Odstrani hlavu 
   if (grid[players[player_num].head.x][players[player_num].head.y] == '@') {
     grid[players[player_num].head.x][players[player_num].head.y] = '.';
@@ -328,7 +320,7 @@ void game_remove_player_from_grid(int player_id) {
     //net_send_line(players[player_num].client_id, "END UMREL SI");
     
   }
-  //net_close(players[player_num].client_id);
+  net_close(players[player_num].client_id);
   player_count--;
 }
 
@@ -338,13 +330,14 @@ int game_over() {
   // 1 - vyprsal cas
   if (mode == 0) {
     for (int i = 0; i < player_count; i++) {
-      if (players[i].score >= 100) {
+      if (players[i].score >= max_score && elapsed_time > 5) {
         winner = i;
         game_end = 1;
       }
     }
-  } else if (total_time > 0) {
-    if (elapsed_time <= 0) {
+  }
+  if (mode == 1) {
+    if (elapsed_time >= total_time) {
       int highest_score = 0;
       for (int i = 0; i < player_count; i++) {
         if (players[i].score > highest_score) {
