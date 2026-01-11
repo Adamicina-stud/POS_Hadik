@@ -10,6 +10,7 @@
 //Sieť
 #define DEFAULT_PORT 5555
 #define MAX_NAME_LEN 32
+#define MAX_PLAYERS 8
 
 //Herné smery
 typedef enum {

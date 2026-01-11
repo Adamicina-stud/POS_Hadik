@@ -60,7 +60,7 @@ static int parse_state_line(const char *line, int *w, int *h, int *paused, int *
     // vráti 1 ak OK, inak 0
     int ww, hh, pp, ss, tt;
     int ok = sscanf(line, "STATE %d %d %d %d %d", &ww, &hh, &pp, &ss, &tt);
-    if (ok != 4) {
+    if (ok != 5) {
     fprintf(stderr, "Nepodarilo sa prečítať STATE\n");
     return 0;
     }

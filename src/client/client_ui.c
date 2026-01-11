@@ -37,14 +37,14 @@ void ui_draw(const char *name, int w, int h, int paused, int score, int time, co
     mvprintw(1, 2, "%s \t\t\tGAME PAUSED", name);
   }
   else if (paused > 0) {
-    mvprintw(1, 2, "%s \t\t\t     %d", name, paused);
+    mvprintw(1, 2, "%s \t\t\tRESUME IN %ds", name, paused);
   }
   else {
     mvprintw(1, 2, "%s", name);
   }
   mvprintw(2, 2, 
-           "Time: %d  Score: %d  Grid: %dx%d   (q=quit)", 
-           time, score, w, h);
+           "Time: %ds  Score: %d  Grid: %dx%d  Paused: %d  (q=quit)", 
+           time, score, w, h, paused);
 
   //rámik okolo obrazovky
   if (has_colors()) attron(COLOR_PAIR(4));
@@ -117,7 +117,7 @@ void ui_draw(const char *name, int w, int h, int paused, int score, int time, co
       mvaddch(yy, xx + 1, out_ch); //vyplny druhý stlpec
       if (pair && has_colors()) attroff(COLOR_PAIR(pair));
     }
-    clrtoeol(); // vymaže zvyšok riadku (keď sa skracuje)
+    //clrtoeol(); // vymaže zvyšok riadku (keď sa skracuje)
   }
   refresh();
 }
