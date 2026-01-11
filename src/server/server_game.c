@@ -27,7 +27,7 @@ static int W, H;
 static player_t players[MAX_PLAYERS];
 static int player_count = 0;
 static char grid[MAX_H][MAX_W];
-static int fruit_count = 0;
+static int fruit_count = 0;                     // ammount of fruit currently on the map
 static int mode = 0;                            // 0 - score mode; 1 - timed mode
 static int winner = 0;
 static int total_time = 0;
@@ -66,11 +66,43 @@ int game_add_player(int client_id, const char *name) {
 void game_set_dir(int client_id, int dir) {
   for (int i = 0; i < player_count; i++) {
     if (players[i].client_id == client_id) {
-      if (players[i].dir == dir + 1 || players[i].dir == dir -1) {
-        break;
+      int dir_chaged = 0;
+      switch (players[i].dir) {
+        case DIR_UP:
+          if (dir != DIR_DOWN) {
+            players[i].dir = dir; 
+            dir_chaged = 1;
+          }
+          break;
+        case DIR_DOWN:
+          if (dir != DIR_UP) {
+            players[i].dir = dir; 
+            dir_chaged = 1;
+          }
+          break;
+        case DIR_LEFT:
+          if (dir != DIR_RIGHT) {
+            players[i].dir = dir; 
+            dir_chaged = 1;
+          }
+          break;
+        case DIR_RIGHT:
+          if (dir != DIR_LEFT) {
+            players[i].dir = dir; 
+            dir_chaged = 1;
+          }
+          break;
+        case DIR_NONE:
+          players[i].dir = dir; 
+          dir_chaged = 1;
+          break;
+        default:
+          players[i].dir = DIR_NONE;
+          break;
       }
-      players[i].dir = dir;
-      printf("Direction changed to: %d\n", players[i].dir);
+      if (dir_chaged == 1) {
+        printf("Direction changed to: %d\n", players[i].dir);
+      }
       return;
     }
   }
