@@ -9,209 +9,199 @@
 
 #define MAX_PLAYERS 8
 
-typedef struct {
-  int x, y;
-} vector2;
+//static int W, H;
+//static player_t players[MAX_PLAYERS];
+//static int player_count = 0;
+//static int first_player_joined = 0;
+//static char grid[MAX_H][MAX_W];
+//static int fruit_count = 0;                     // ammount of fruit currently on the map
+//static int mode = 0;                            // 0 - score mode; 1 - timed mode
+//static int winner = 0;
+//static int total_time = 0;
+//static int elapsed_time = 0;                    // total_time - time
 
-typedef struct {
-  int client_id;
-  char name[MAX_NAME_LEN];
-  int dir;
-  int last_dir;
-  vector2 head;
-  vector2 body[256];
-  int fruit_eaten;
-  int score;
-  int pause_time;
-  int unpaused;       // 0 pauzol hru, 1 hru odpauzol a za 3 ticky bude v hre
-} player_t;
-
-static int W, H;
-static player_t players[MAX_PLAYERS];
-static int player_count = 0;
-static int first_player_joined = 0;
-static char grid[MAX_H][MAX_W];
-static int fruit_count = 0;                     // ammount of fruit currently on the map
-static int mode = 0;                            // 0 - score mode; 1 - timed mode
-static int winner = 0;
-static int total_time = 0;
-static int elapsed_time = 0;                    // total_time - time
-
-void game_init(int width, int height, int time, int p_mode, int p_walls) {
-  W = width;
-  H = height;
-  player_count = 0;
-  total_time = time;
+void game_init(int width, int height, int time, int p_mode, int p_walls, game_data *g) {
+  g->W = width;
+  g->H = height;
+  g->player_count = 0;
+  g->total_time = time;
+  g->first_player_joined = 0;
+  g->fruit_count = 0;
+  g->winner = 0;
   if (time > 0) {
-    elapsed_time = time;
+    g->elapsed_time = time;
   } else {
-    elapsed_time = 0;
+    g->elapsed_time = 0;
   }
-  mode = p_mode;
-  game_build_grid(p_walls);
+  g->mode = p_mode;
+  for (int i = 0; i < MAX_PLAYERS; i++) {
+    g->players[i].score = 0;
+  }
+  game_build_grid(p_walls, g);
 }
 
-int get_player_count() {
-  printf("Realny počet hračov: %d\n", player_count);
-  if (first_player_joined == 0) return 1;
-  return player_count;
+
+int get_player_count(game_data *g) {
+  printf("Realny počet hračov: %d\n", g->player_count);
+  if (g->first_player_joined == 0) return 1;
+  return g->player_count;
 }
 
-int game_add_player(int client_id, const char *name) {
-  if (player_count >= MAX_PLAYERS) return -1;
+int game_add_player(game_data *g, int client_id, const char *name) {
+  if (g->player_count >= MAX_PLAYERS) return -1;
 
-  players[player_count].client_id = client_id;
-  strcpy(players[player_count].name, name);
-  players[player_count].dir = DIR_UP;
-  players[player_count].head.x = (H / 2) + player_count;      // Dat do funkcie ktora najde miesto
-  players[player_count].head.y = (W / 2) + player_count;      //  - | | -
-  players[player_count].fruit_eaten = 0;
-  players[player_count].score = 0;
-  players[player_count].pause_time = 0;
-  players[player_count].last_dir = DIR_UP;
-  players[player_count].unpaused = 0;
+  g->players[g->player_count].client_id = client_id;
+  strcpy(g->players[g->player_count].name, name);
+  g->players[g->player_count].dir = DIR_UP;
+  g->players[g->player_count].head.x = (g->H / 2) + g->player_count;      // Dat do funkcie ktora najde miesto
+  g->players[g->player_count].head.y = (g->W / 2) + g->player_count;      //  - | | -
+  g->players[g->player_count].fruit_eaten = 0;
+  g->players[g->player_count].score = 0;
+  g->players[g->player_count].pause_time = 0;
+  g->players[g->player_count].last_dir = DIR_UP;
+  g->players[g->player_count].unpaused = 0;
   for (int segment = 0; segment < 256; segment++) {
-    players[player_count].body[segment].x = -1;
-    players[player_count].body[segment].y = -1;
+    g->players[g->player_count].body[segment].x = -1;
+    g->players[g->player_count].body[segment].y = -1;
   }
-  if (first_player_joined == 0) {
-    first_player_joined++;
+  if (g->first_player_joined == 0) {
+    g->first_player_joined++;
   }
-  player_count++;
-  printf("Pripojil sa novy hrac! Pocet hracov: %d\n", player_count);
+  g->player_count++;
+  printf("Pripojil sa novy hrac! Pocet hracov: %d\n", g->player_count);
   return 0;
 }
 
-void game_set_dir(int client_id, int dir) {
-  for (int i = 0; i < player_count; i++) {
-    if (players[i].client_id == client_id) {
+void game_set_dir(int client_id, int dir, game_data *g) {
+  for (int i = 0; i < g->player_count; i++) {
+    if (g->players[i].client_id == client_id) {
       int dir_chaged = 0;
-      if (players[i].pause_time > 0) {
+      if (g->players[i].pause_time > 0) {
         if (dir == DIR_NONE) {
-          players[i].unpaused = 1;
+          g->players[i].unpaused = 1;
         }
         continue;
       }
 
-      switch (players[i].dir) {
+      switch (g->players[i].dir) {
         case DIR_UP:
-          if (dir != DIR_DOWN && players[i].dir != DIR_NONE) {
-            players[i].last_dir = players[i].dir;
-            players[i].dir = dir;
+          if (dir != DIR_DOWN && g->players[i].dir != DIR_NONE) {
+            g->players[i].last_dir = g->players[i].dir;
+            g->players[i].dir = dir;
             dir_chaged = 1;
           }
           break;
         case DIR_DOWN:
-          if (dir != DIR_UP && players[i].dir != DIR_NONE) {
-            players[i].last_dir = players[i].dir;
-            players[i].dir = dir; 
+          if (dir != DIR_UP && g->players[i].dir != DIR_NONE) {
+            g->players[i].last_dir = g->players[i].dir;
+            g->players[i].dir = dir; 
             dir_chaged = 1;
           }
           break;
         case DIR_LEFT:
-          if (dir != DIR_RIGHT && players[i].dir != DIR_NONE) {
-            players[i].last_dir = players[i].dir;
-            players[i].dir = dir; 
+          if (dir != DIR_RIGHT && g->players[i].dir != DIR_NONE) {
+            g->players[i].last_dir = g->players[i].dir;
+            g->players[i].dir = dir; 
             dir_chaged = 1;
           }
           break;
         case DIR_RIGHT:
-          if (dir != DIR_LEFT && players[i].dir != DIR_NONE) {
-            players[i].last_dir = players[i].dir;
-            players[i].dir = dir; 
+          if (dir != DIR_LEFT && g->players[i].dir != DIR_NONE) {
+            g->players[i].last_dir = g->players[i].dir;
+            g->players[i].dir = dir; 
             dir_chaged = 1;
           }
           break;
         case DIR_NONE:
-          players[i].dir = dir;
-          players[i].pause_time = 3;
-          players[i].unpaused = 0;
+          g->players[i].dir = dir;
+          g->players[i].pause_time = 3;
+          g->players[i].unpaused = 0;
           dir_chaged = 1;
           break;
         default:
-          players[i].dir = DIR_NONE;
+          g->players[i].dir = DIR_NONE;
           break;
       }
       if (dir_chaged == 1) {
-        printf("Direction changed to: %d\n", players[i].dir);
+        printf("Direction changed to: %d\n", g->players[i].dir);
       }
       return;
     }
   }
 }
 
-void game_tick() {
-  if(total_time > 0) {
-    elapsed_time--;
+void game_tick(game_data *g) {
+  if(g->total_time > 0) {
+    g->elapsed_time--;
   } else {
-    elapsed_time++;
+    g->elapsed_time++;
   }
-  for (int player = 0; player < player_count; player++) {
+  for (int player = 0; player < g->player_count; player++) {
     // Hrac pauzol hru
-    if (players[player].dir == DIR_NONE) {
-      if (players[player].unpaused == 1) {
-        if (players[player].pause_time <= 0) {
-          players[player].dir = players[player].last_dir;
-          players[player].unpaused = 0;
+    if (g->players[player].dir == DIR_NONE) {
+      if (g->players[player].unpaused == 1) {
+        if (g->players[player].pause_time <= 0) {
+          g->players[player].dir = g->players[player].last_dir;
+          g->players[player].unpaused = 0;
         } else {
-          players[player].pause_time--;
-          printf("Pause time: %d\n", players[player].pause_time);
+          g->players[player].pause_time--;
+          printf("Pause time: %d\n", g->players[player].pause_time);
         }
       }
       continue;
     }
-    int last_x = players[player].head.x;
-    int last_y = players[player].head.y;
+    int last_x = g->players[player].head.x;
+    int last_y = g->players[player].head.y;
 
 
     // Posunutie hlavy
-    switch (players[player].dir) {
+    switch (g->players[player].dir) {
       case DIR_UP:
-        players[player].head.y--;
+        g->players[player].head.y--;
         break;
       case DIR_DOWN:
-        players[player].head.y++;
+        g->players[player].head.y++;
         break;
       case DIR_LEFT:
-        players[player].head.x--;
+        g->players[player].head.x--;
         break;
       case DIR_RIGHT:
-        players[player].head.x++;
+        g->players[player].head.x++;
         break;
     }
     
     // Prechod na opacnu stranu hernej plochy
-    if (players[player].head.x <= -1) {
-      players[player].head.x = W - 1;
-      grid[players[player].head.x][players[player].head.y] = '@';
-    } else if (players[player].head.x >= W) {
-      players[player].head.x = 0;
-      grid[players[player].head.x][players[player].head.y] = '@';
+    if (g->players[player].head.x <= -1) {
+      g->players[player].head.x = g->W - 1;
+      g->grid[g->players[player].head.x][g->players[player].head.y] = '@';
+    } else if (g->players[player].head.x >= g->W) {
+      g->players[player].head.x = 0;
+      g->grid[g->players[player].head.x][g->players[player].head.y] = '@';
     }
 
-    if (players[player].head.y <= -1) {
-      players[player].head.y = H - 1;
-      grid[players[player].head.x][players[player].head.y] = '@';
-    } else if (players[player].head.y >= H) {
-      players[player].head.y = 0;
-      grid[players[player].head.x][players[player].head.y] = '@';
+    if (g->players[player].head.y <= -1) {
+      g->players[player].head.y = g->H - 1;
+      g->grid[g->players[player].head.x][g->players[player].head.y] = '@';
+    } else if (g->players[player].head.y >= g->H) {
+      g->players[player].head.y = 0;
+      g->grid[g->players[player].head.x][g->players[player].head.y] = '@';
     }
 
     // Kolizie
-    switch (grid[players[player].head.x][players[player].head.y]) {
+    switch (g->grid[g->players[player].head.x][g->players[player].head.y]) {
       case '*':
-        players[player].fruit_eaten++;
-        players[player].score++;
-        grid[players[player].head.x][players[player].head.y] = '@';
-        fruit_count--;
+        g->players[player].fruit_eaten++;
+        g->players[player].score++;
+        g->grid[g->players[player].head.x][g->players[player].head.y] = '@';
+        g->fruit_count--;
         break;
       case '.':
-        grid[players[player].head.x][players[player].head.y] = '@';
-        grid[last_x][last_y] = '.';
+        g->grid[g->players[player].head.x][g->players[player].head.y] = '@';
+        g->grid[last_x][last_y] = '.';
         break;
       case '#':
       case 'o':
-        game_remove_player_from_grid(players[player].client_id);
+        game_remove_player_from_grid(g->players[player].client_id, g);
         break;
       default:
         break;
@@ -220,44 +210,44 @@ void game_tick() {
 
     // Posunutie tela
     for (int segment = 0; segment < 256; segment++) {
-      if (players[player].body[segment].x == -1) {         // Segment neexistuje
-        if (players[player].fruit_eaten > 0) {             // ak zjedol had ovocie prida sa segment
-          players[player].fruit_eaten--;
-          players[player].body[segment].x = last_x;
-          players[player].body[segment].y = last_y;
+      if (g->players[player].body[segment].x == -1) {         // Segment neexistuje
+        if (g->players[player].fruit_eaten > 0) {             // ak zjedol had ovocie prida sa segment
+          g->players[player].fruit_eaten--;
+          g->players[player].body[segment].x = last_x;
+          g->players[player].body[segment].y = last_y;
           break;
         }
-        grid[last_x][last_y] = '.';
+        g->grid[last_x][last_y] = '.';
         break;
       }
 
-      if (segment == 0) grid[last_x][last_y] = 'o';
-      int last_x_temp = players[player].body[segment].x;  // Pomocne premenne
-      int last_y_temp = players[player].body[segment].y;
+      if (segment == 0) g->grid[last_x][last_y] = 'o';
+      int last_x_temp = g->players[player].body[segment].x;  // Pomocne premenne
+      int last_y_temp = g->players[player].body[segment].y;
 
-      players[player].body[segment].x = last_x;
-      players[player].body[segment].y = last_y;
+      g->players[player].body[segment].x = last_x;
+      g->players[player].body[segment].y = last_y;
 
       last_x = last_x_temp;
       last_y = last_y_temp;
     }
   }
 
-  if (fruit_count < player_count) {
-    game_add_fruit(10);
+  if (g->fruit_count < g->player_count) {
+    game_add_fruit(10, g);
   }
 }
 
-int game_add_fruit(int num_of_attempts) {
+int game_add_fruit(int num_of_attempts, game_data *g) {
   int num = 0;
 
   while (num < num_of_attempts) {
-    int x = rand() % W;
-    int y = rand() % H;
+    int x = rand() % g->W;
+    int y = rand() % g->H;
 
-    if (grid[x][y] == '.') {
-      grid[x][y] = '*';
-      fruit_count++;
+    if (g->grid[x][y] == '.') {
+      g->grid[x][y] = '*';
+      g->fruit_count++;
       return 0;
     }
     num++;
@@ -266,42 +256,42 @@ int game_add_fruit(int num_of_attempts) {
   return 1;
 }
 
-void game_build_grid(int walls) {
-  for (int y = 0; y < H; y++) {
-    for (int x = 0; x < W; x++) {
-      grid[x][y] = '.';
-      if (walls == 1 && (y == 0 || y == H - 1 || x == 0 || x == W - 1)) {
-        grid[x][y] = '#';
+void game_build_grid(int walls, game_data *g) {
+  for (int y = 0; y < g->H; y++) {
+    for (int x = 0; x < g->W; x++) {
+      g->grid[x][y] = '.';
+      if (walls == 1 && (y == 0 || y == g->H - 1 || x == 0 || x == g->W - 1)) {
+        g->grid[x][y] = '#';
       }
     }
   }
 }
 
-void game_send_grid_to_clients(int tick) {
-  for (int player = 0; player < player_count; player++) {
+void game_send_grid_to_clients(int tick, game_data *g) {
+  for (int player = 0; player < g->player_count; player++) {
     char message[50];
-    snprintf(message, sizeof(message), "STATE %d %d %d %d %d", W, H, players[player].pause_time, players[player].score, elapsed_time);
-    net_send_line(players[player].client_id, message);
+    snprintf(message, sizeof(message), "STATE %d %d %d %d %d", g->W, g->H, g->players[player].pause_time, g->players[player].score, g->elapsed_time);
+    net_send_line(g->players[player].client_id, message);
 
-    net_send_line(players[player].client_id, "GRID");
-    for (int y = 0; y < H; y++) {
-      char line[W + 1];
-      for (int x = 0; x < W; x++) {
-        line[x] = grid[x][y];
+    net_send_line(g->players[player].client_id, "GRID");
+    for (int y = 0; y < g->H; y++) {
+      char line[g->W + 1];
+      for (int x = 0; x < g->W; x++) {
+        line[x] = g->grid[x][y];
         //printf("%c", line[x]);                                                   
         }
       //printf("\n");
-      line[W] = '\0';
-      net_send_line(players[player].client_id, line);
+      line[g->W] = '\0';
+      net_send_line(g->players[player].client_id, line);
     }
   }
 }
 
-void game_remove_player_from_grid(int player_id) {
+void game_remove_player_from_grid(int player_id, game_data *g) {
   // nájdi index hráča podľa client_id
   int idx = -1;
-  for (int i = 0; i < player_count; i++) {
-    if (players[i].client_id == player_id) {
+  for (int i = 0; i < g->player_count; i++) {
+    if (g->players[i].client_id == player_id) {
       idx = i;
       break;
     }
@@ -309,89 +299,90 @@ void game_remove_player_from_grid(int player_id) {
   if (idx == -1) return;
 
   // vymaž hlavu z gridu (bezpečne v rozsahu)
-  int hx = players[idx].head.x;
-  int hy = players[idx].head.y;
-  if (hx >= 0 && hx < W && hy >= 0 && hy < H) {
-    if (grid[hx][hy] == '@') grid[hx][hy] = '.';
+  int hx = g->players[idx].head.x;
+  int hy = g->players[idx].head.y;
+  if (hx >= 0 && hx < g->W && hy >= 0 && hy < g->H) {
+    if (g->grid[hx][hy] == '@') g->grid[hx][hy] = '.';
   }
 
   // vymaž telo
   for (int s = 0; s < 256; s++) {
-    int bx = players[idx].body[s].x;
-    int by = players[idx].body[s].y;
+    int bx = g->players[idx].body[s].x;
+    int by = g->players[idx].body[s].y;
     if (bx == -1) break;
 
-    if (bx >= 0 && bx < W && by >= 0 && by < H) {
-      if (grid[bx][by] == 'o') grid[bx][by] = '.';
-      else if (grid[bx][by] == '@') grid[bx][by] = '.';
+    if (bx >= 0 && bx < g->W && by >= 0 && by < g->H) {
+      if (g->grid[bx][by] == 'o') g->grid[bx][by] = '.';
+      else if (g->grid[bx][by] == '@') g->grid[bx][by] = '.';
     }
 
-    players[idx].body[s].x = -1;
-    players[idx].body[s].y = -1;
+    g->players[idx].body[s].x = -1;
+    g->players[idx].body[s].y = -1;
   }
 
-  players[idx].head.x = -1;
-  players[idx].head.y = -1;
+  g->players[idx].head.x = -1;
+  g->players[idx].head.y = -1;
 
   // zavri socket iba tohto hráča
-  if (players[idx].client_id != 0) {
-    net_close(players[idx].client_id);
+  if (g->players[idx].client_id != 0) {
+    net_close(g->players[idx].client_id);
   }
 
   // SWAP-REMOVE: posledného hráča presuň na miesto odstráneného
   // (aby pole ostalo kompaktné a player_count sedel)
-  int last = player_count - 1;
+  int last = g->player_count - 1;
   if (idx != last) {
-    players[idx] = players[last];
+    g->players[idx] = g->players[last];
   }
 
   // zníž počet hráčov
-  player_count--;
-  printf("Hráč sa odpojil. Počet hráčov: %d\n", player_count);
+  g->player_count--;
+  printf("Hráč sa odpojil. Počet hráčov: %d\n", g->player_count);
 }
 
-int game_over() {
+int game_over(game_data *g) {
   int game_end = 0;
   // 0 - dosiahnute max skore
   // 1 - vyprsal cas
-  if (mode == 0) {
-    for (int i = 0; i < player_count; i++) {
-      if (players[i].score >= 100) {
-        winner = i;
+  if (g->mode == 0) {
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+      if (g->players[i].score >= 100) {
+        g->winner = i;
         game_end = 1;
       }
     }
-  } else if (total_time > 0) {
-    if (elapsed_time <= 0) {
+  } else if (g->mode == 1) {
+    if (g->elapsed_time <= 0) {
       int highest_score = 0;
-      for (int i = 0; i < player_count; i++) {
-        if (players[i].score > highest_score) {
-          winner = i;
+      for (int i = 0; i < g->player_count; i++) {
+        if (g->players[i].score > highest_score) {
+          g->winner = i;
           game_end = 1;
         }
       }
     }
   }
   
-  /*
+  
   if (game_end == 1) {
-    for (int i = 0; i < player_count; i++) {
+    for (int i = 0; i < g->player_count; i++) {
       char line[MAX_NAME_LEN + 10] = "END ";
-      if (players[i].name == players[winner].name) {
+      if (g->players[i].name == g->players[g->winner].name) {
         strcat(line, "VYHRAL SI");
       } else {
         strcat(line, "PREHRAL SI");
       }
-      net_send_line(players[i].client_id, line);
-      net_close(players[i].client_id);
-      players[i].client_id = 0;
+      net_send_line(g->players[i].client_id, line);
+      net_close(g->players[i].client_id);
+      g->players[i].client_id = 0;
     }
   }
-*/
+
 
   return game_end;
 }
 
+/*
 char* game_get_winner() {
   return players[winner].name;
 }
@@ -403,6 +394,7 @@ int game_width() {
 int game_height() {
   return H;
 }
+*/
 
 void game_cleanup() {
   
