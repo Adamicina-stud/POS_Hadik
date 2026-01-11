@@ -28,6 +28,7 @@ typedef struct {
   int listen_fd;
   int client_fd;
   int close;
+  pthread_t *thread;
 } input_thread_data_t;
 
 void *listen_for_input(void *arg) {
@@ -65,19 +66,22 @@ void *listen_for_input(void *arg) {
           break;
       }
       game_set_dir(data->client_fd, dir_int);
-      printf("Direction changed: %d\n", dir_int);
     
-    } else if (sscanf(line, "LEAVE") == 1) {
+    } else if (sscanf(line, "LEAVE") == 0) {
       game_remove_player_from_grid(data->client_fd);
       data->close = 1;
+      pthread_mutex_unlock(data->mutex);
+      break;
     } else if (sscanf(line, "LIR %c", &dir) == 1) {
       game_remove_player_from_grid(data->client_fd);
       data->close = 1;
+      pthread_mutex_unlock(data->mutex);
+      break;
     }
     pthread_mutex_unlock(data->mutex);
   }
-  printf("Ending join thread %d\n", data->client_fd);
-  pthread_mutex_destroy(data->mutex);
+
+  printf("Ending input thread %d\n", data->client_fd);
   return NULL;
 }
 
@@ -236,7 +240,7 @@ int main(int argc, char *argv[]) {
           if (input_data[j].client_fd == 0) {
             input_data[j].client_fd = client_fd;
             pthread_create(&input_threads[j], NULL, listen_for_input, &input_data[j]);
-            printf("Created thread for client: %d\n", client_fd);
+            input_data[j].thread = &input_threads[j];
             break;
           }
         }
@@ -246,7 +250,10 @@ int main(int argc, char *argv[]) {
 
       // Zavre nepouzite thready
       if (input_data[i].close == 1) {
-        pthread_join(input_threads[i], NULL);
+        printf("Joining thread of client %d\n", input_data[i].client_fd);
+        pthread_join(*input_data[i].thread, NULL);
+        input_data[i].close = 0;
+        input_data[i].client_fd = 0;
       }
     }
     
@@ -268,7 +275,7 @@ int main(int argc, char *argv[]) {
   pthread_join(listener_thread, NULL);
 
   net_close(listen_fd);
-  
+  printf("Ending server");
   return 0;
 }
 

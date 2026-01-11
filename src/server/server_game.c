@@ -76,6 +76,13 @@ void game_set_dir(int client_id, int dir) {
   for (int i = 0; i < player_count; i++) {
     if (players[i].client_id == client_id) {
       int dir_chaged = 0;
+      if (players[i].pause_time > 0) {
+        if (dir == DIR_NONE) {
+          players[i].unpaused = 1;
+        }
+        continue;
+      }
+
       switch (players[i].dir) {
         case DIR_UP:
           if (dir != DIR_DOWN && players[i].dir != DIR_NONE) {
@@ -106,16 +113,10 @@ void game_set_dir(int client_id, int dir) {
           }
           break;
         case DIR_NONE:
-          /*
-          if (players[i].dir == DIR_NONE) {
-            players[i].unpaused = 1;
-          } else {
-            players[i].dir = dir;
-            players[i].pause_time = 3;
-            players[i].unpaused = 0;
-          }
+          players[i].dir = dir;
+          players[i].pause_time = 3;
+          players[i].unpaused = 0;
           dir_chaged = 1;
-          */
           break;
         default:
           players[i].dir = DIR_NONE;
@@ -141,16 +142,17 @@ void game_tick() {
       if (players[player].unpaused == 1) {
         if (players[player].pause_time <= 0) {
           players[player].dir = players[player].last_dir;
+          players[player].unpaused = 0;
         } else {
           players[player].pause_time--;
+          printf("Pause time: %d\n", players[player].pause_time);
         }
       }
       continue;
     }
     int last_x = players[player].head.x;
     int last_y = players[player].head.y;
-    printf("x: %d, y: %d\n\n", players[player].head.x, players[player].head.y);
-    printf("Direction: %d\n", players[player].dir);
+
 
     // Posunutie hlavy
     switch (players[player].dir) {
@@ -276,9 +278,9 @@ void game_send_grid_to_clients(int tick) {
       char line[W + 1];
       for (int x = 0; x < W; x++) {
         line[x] = grid[x][y];
-        printf("%c", line[x]);                                                    // TEST
-      }
-      printf("\n");
+        //printf("%c", line[x]);                                                   
+        }
+      //printf("\n");
       line[W] = '\0';
       net_send_line(players[player].client_id, line);
     }
@@ -294,6 +296,12 @@ void game_remove_player_from_grid(int player_id) {
       break;
     }
   }
+
+  /*
+  if (player_num == 0) {
+    return;
+  }
+  */
 
   // Odstrani hlavu 
   if (grid[players[player_num].head.x][players[player_num].head.y] == '@') {
@@ -316,7 +324,7 @@ void game_remove_player_from_grid(int player_id) {
   players[player_num].head.y = -1;
 
   net_send_line(players[player_num].client_id, "END UMREL SI");
-  net_close(players[player_num].client_id);
+  //net_close(players[player_num].client_id);
   player_count--;
 }
 
